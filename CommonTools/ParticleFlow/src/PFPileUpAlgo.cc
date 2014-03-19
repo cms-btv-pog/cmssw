@@ -1,9 +1,14 @@
 #include "CommonTools/ParticleFlow/interface/PFPileUpAlgo.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
+#include "DataFormats/Candidate/interface/Candidate.h"
+#include "DataFormats/Math/interface/deltaR.h"
+#include "TrackingTools/IPTools/interface/IPTools.h"
 
 void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates, 
 			   const reco::VertexCollection & vertices, 
+                        const edm::View<reco::Candidate> & jets,
+                        const TransientTrackBuilder & builder,
 			   const edm::Handle<reco::PFCandidateCollection> * handle)  {
 
   pfCandidatesFromVtx_.clear();
@@ -17,7 +22,7 @@ void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates,
 
     switch( cand.particleId() ) {
     case reco::PFCandidate::h:
-      ivertex = chargedHadronVertex( vertices, cand );
+      ivertex = chargedHadronVertex( vertices, cand, jets, builder );
       break;
     default:
       continue;
@@ -41,7 +46,10 @@ void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates,
 
 
 int 
-PFPileUpAlgo::chargedHadronVertex( const reco::VertexCollection& vertices, const reco::PFCandidate& pfcand ) const {
+PFPileUpAlgo::chargedHadronVertex( const reco::VertexCollection& vertices,
+                                   const reco::PFCandidate& pfcand,
+                                   const edm::View<reco::Candidate>& jets,
+                                   const TransientTrackBuilder& builder) const {
 
   
   reco::TrackBaseRef trackBaseRef( pfcand.trackRef() );
@@ -72,6 +80,50 @@ PFPileUpAlgo::chargedHadronVertex( const reco::VertexCollection& vertices, const
 	  iVertex=index;
 	  nFoundVertex++;
 	}	 	
+      }
+    }
+  }
+
+  // if using jets and no vertex found or vertex is not the primary interaction vertex
+  if( useJets_ && ( nFoundVertex==0 || (nFoundVertex>0 && iVertex!=0) ) )
+  {
+    // first find the closest jet within maxJetDeltaR_
+    int jetIdx = -1;
+    double minDeltaR = 999.;
+    for(edm::View<reco::Candidate>::const_iterator ij=jets.begin(); ij!=jets.end(); ++ij)
+    {
+      if( ij->pt() < minJetPt_ ) continue; // skip jets below the jet Pt threshold
+
+      double deltaR = reco::deltaR( *ij, *trackBaseRef );
+      if( deltaR < maxJetDeltaR_ && deltaR < minDeltaR )
+      {
+        minDeltaR = deltaR;
+        jetIdx = std::distance(jets.begin(), ij);
+      }
+    }
+
+    // if jet found
+    if( jetIdx!=-1 )
+    {
+      reco::TransientTrack transientTrack = builder.build(*trackBaseRef);
+      GlobalVector direction(jets.at(jetIdx).px(), jets.at(jetIdx).py(), jets.at(jetIdx).pz());
+      // find the vertex with the smallest distanceToJetAxis that is still within maxDistaneToJetAxis_
+      int vtxIdx = -1;
+      double minDistanceToJetAxis = 999.;
+      for(IV iv=vertices.begin(); iv!=vertices.end(); ++iv)
+      {
+        double distanceToJetAxis = IPTools::jetTrackDistance(transientTrack, direction, *iv).second.value();
+        if( distanceToJetAxis < maxDistanceToJetAxis_ && distanceToJetAxis < minDistanceToJetAxis )
+        {
+          minDistanceToJetAxis = distanceToJetAxis;
+          vtxIdx = std::distance(vertices.begin(), iv);
+        }
+      }
+      // if the vertex with the smallest distanceToJetAxis is the primary interaction vertex, reassign iVertex
+      if( vtxIdx==0 )
+      {
+        iVertex=vtxIdx;
+        if( nFoundVertex==0 ) nFoundVertex++;
       }
     }
   }

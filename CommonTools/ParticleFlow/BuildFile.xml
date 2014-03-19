@@ -6,6 +6,8 @@
 <use   name="DataFormats/PatCandidates"/>
 <use   name="rootmath"/>
 <use   name="FWCore/ParameterSet"/>
+<use   name="TrackingTools/TransientTrack"/>
+<use   name="TrackingTools/IPTools"/>
 <export>
   <lib   name="1"/>
 </export>
