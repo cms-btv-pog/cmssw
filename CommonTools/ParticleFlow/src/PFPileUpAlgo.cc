@@ -2,8 +2,10 @@
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
+#include "DataFormats/MuonReco/interface/Muon.h"
 #include "DataFormats/Math/interface/deltaR.h"
 #include "TrackingTools/IPTools/interface/IPTools.h"
+#include "TrackingTools/PatternTools/interface/TwoTrackMinimumDistance.h"
 
 void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates, 
 			   const reco::VertexCollection & vertices, 
@@ -13,6 +15,24 @@ void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates,
 
   pfCandidatesFromVtx_.clear();
   pfCandidatesFromPU_.clear();
+
+  reco::PFCandidateCollection pfMuons;
+  // if using muons
+  if( useMuons_ ) {
+
+    for( unsigned i=0; i<pfCandidates.size(); ++i ) {
+
+      const reco::PFCandidate& cand = pfCandidates[i];
+      // skip if PF candidate is not muon
+      if( cand.particleId() != reco::PFCandidate::mu ) continue;
+      // skip if not global or tracker muon
+      if( !(cand.muonRef()->isGlobalMuon() || cand.muonRef()->isTrackerMuon()) ) continue;
+      // skip if low Pt
+      if( cand.pt() < minMuonPt_ ) continue;
+
+      pfMuons.push_back(cand);
+    }
+  }
 
   for( unsigned i=0; i<pfCandidates.size(); i++ ) {
     
@@ -27,6 +47,10 @@ void PFPileUpAlgo::process(const reco::PFCandidateCollection & pfCandidates,
     default:
       continue;
     } 
+    
+    // if using muons and associated primary vertex is pile-up
+    if( useMuons_ && ivertex > 0 )
+      ivertex = chargedHadronMuon( ivertex, cand, pfMuons, builder );
     
     // no associated vertex, or primary vertex
     // not pile-up
@@ -119,7 +143,7 @@ PFPileUpAlgo::chargedHadronVertex( const reco::VertexCollection& vertices,
           vtxIdx = std::distance(vertices.begin(), iv);
         }
       }
-      // if the vertex with the smallest distanceToJetAxis is the primary interaction vertex, reassign iVertex
+      // if the vertex with the smallest distanceToJetAxis is the primary interaction vertex, re-assign iVertex
       if( vtxIdx==0 )
       {
         iVertex=vtxIdx;
@@ -161,3 +185,42 @@ PFPileUpAlgo::chargedHadronVertex( const reco::VertexCollection& vertices,
   return -1 ;
 }
 
+
+int 
+PFPileUpAlgo::chargedHadronMuon( const int ivertex,
+                                 const reco::PFCandidate& pfcand,
+                                 const reco::PFCandidateCollection & pfmuons,
+                                 const TransientTrackBuilder& builder) const {
+
+  int iVertex = ivertex;
+  // if no selected muons
+  if( pfmuons.size()==0 )
+    return iVertex;
+
+  reco::TrackBaseRef trackBaseRef( pfcand.trackRef() );
+  reco::TransientTrack transientTrack = builder.build(*trackBaseRef);
+
+  // loop over selected muons
+  for( unsigned i=0; i<pfmuons.size(); ++i ) {
+
+    const reco::PFCandidate& pfmuon = pfmuons[i];
+    // skip muon if too far in dR
+    if( reco::deltaR( *trackBaseRef, pfmuon ) > maxMuonDeltaR_ ) continue;
+
+    reco::TransientTrack transientMuonTrack = builder.build( *(pfmuon.muonRef()->innerTrack()) );
+
+    TwoTrackMinimumDistance dist;
+    // calculate distance between the charged hadron track and the muon track
+    if( dist.calculate( transientTrack.impactPointState(), transientMuonTrack.impactPointState()) )
+    {
+      // if the charged hadron track is within maxDistanceToMuon_ from the muon track, re-assign iVertex to the primary interaction vertex
+      if( dist.distance() < maxDistanceToMuon_ )
+      {
+        iVertex = 0;
+        break;
+      }
+    }
+  }
+
+  return iVertex;
+}

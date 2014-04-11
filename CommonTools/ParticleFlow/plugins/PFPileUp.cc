@@ -40,7 +40,8 @@ PFPileUp::PFPileUp(const edm::ParameterSet& iConfig) {
 
   if ( iConfig.exists("Jets") )
   {
-    useJets_ = true;
+    useJets_
+      = iConfig.getParameter<bool>("useJets");
 
     inputTagJets_
       = iConfig.getParameter<InputTag>("Jets");
@@ -62,6 +63,28 @@ PFPileUp::PFPileUp(const edm::ParameterSet& iConfig) {
     maxJetDeltaR_ = 999.;
     maxDistanceToJetAxis_ = 999.;
   }
+
+  if ( iConfig.exists("useMuons") )
+  {
+    useMuons_
+      = iConfig.getParameter<bool>("useMuons");
+
+    minMuonPt_
+      = iConfig.getParameter<double>("minMuonPt");
+
+    maxMuonDeltaR_
+      = iConfig.getParameter<double>("maxMuonDeltaR");
+
+    maxDistanceToMuon_
+      = iConfig.getParameter<double>("maxDistanceToMuon");
+  }
+  else
+  {
+    useMuons_ = false;
+    minMuonPt_ = 0.;
+    maxMuonDeltaR_ = 999.;
+    maxDistanceToMuon_ = 999.;
+  }
   // Configure the algo
   pileUpAlgo_.setVerbose(verbose_);
   pileUpAlgo_.setCheckClosestZVertex(checkClosestZVertex_);
@@ -69,6 +92,10 @@ PFPileUp::PFPileUp(const edm::ParameterSet& iConfig) {
   pileUpAlgo_.setMinJetPt(minJetPt_);
   pileUpAlgo_.setMaxJetDeltaR(maxJetDeltaR_);
   pileUpAlgo_.setMaxDistanceToJetAxis(maxDistanceToJetAxis_);
+  pileUpAlgo_.setUseMuons(useMuons_);
+  pileUpAlgo_.setMinMuonPt(minMuonPt_);
+  pileUpAlgo_.setMaxMuonDeltaR(maxMuonDeltaR_);
+  pileUpAlgo_.setMaxDistanceToMuon(maxDistanceToMuon_);
 
   produces<reco::PFCandidateCollection>();
   
@@ -113,7 +140,7 @@ void PFPileUp::produce(Event& iEvent,
 
     // get TransientTrackBuilder
     ESHandle<TransientTrackBuilder> builder;
-    if( useJets_ )
+    if( useJets_ || useMuons_ )
       iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", builder);
 
 

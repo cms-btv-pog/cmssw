@@ -70,11 +70,23 @@ class PFPileUp : public edm::EDProducer {
   /// minimum jet Pt
   double  minJetPt_;
 
-  /// maximum dR from track to the jet axis
+  /// maximum dR to the jet axis
   double  maxJetDeltaR_;
 
-  /// maximum distance from track to the jet axis
+  /// maximum distance to the jet axis
   double  maxDistanceToJetAxis_;
+
+  /// use muons ?
+  bool  useMuons_;
+
+  /// minimum muon Pt
+  double  minMuonPt_;
+
+  /// maximum dR to the muon
+  double  maxMuonDeltaR_;
+
+  /// maximum distance to the muon track
+  double  maxDistanceToMuon_;
 };
 
 #endif
