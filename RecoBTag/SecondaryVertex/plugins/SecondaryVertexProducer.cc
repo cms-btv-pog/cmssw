@@ -44,11 +44,34 @@
 #include "RecoBTag/SecondaryVertex/interface/VertexFilter.h"
 #include "RecoBTag/SecondaryVertex/interface/VertexSorting.h"
 
-#include "DataFormats/GeometryVector/interface/VectorUtil.h"
+//#include "DataFormats/GeometryVector/interface/VectorUtil.h"
+#include "DataFormats/Math/interface/deltaR.h"
+
+#include "fastjet/JetDefinition.hh"
+#include "fastjet/ClusterSequence.hh"
+#include "fastjet/PseudoJet.hh"
+
+//
+// constants, enums and typedefs
+//
+typedef boost::shared_ptr<fastjet::ClusterSequence>  ClusterSequencePtr;
+typedef boost::shared_ptr<fastjet::JetDefinition>    JetDefPtr;
+
 
 using namespace reco;
 
 namespace {
+	class VertexInfo : public fastjet::PseudoJet::UserInfoBase{
+	  public:
+	    VertexInfo(const int vertexIndex) :
+	      m_vertexIndex(vertexIndex) { }
+
+	    inline const int vertexIndex() const { return m_vertexIndex; }
+
+	  protected:
+	    int m_vertexIndex;
+	};
+
 	template<typename T>
 	struct RefToBaseLess : public std::binary_function<edm::RefToBase<T>,
 							   edm::RefToBase<T>,
@@ -70,6 +93,20 @@ class SecondaryVertexProducer : public edm::EDProducer {
 	virtual void produce(edm::Event &event, const edm::EventSetup &es) override;
 
     private:
+       void matchReclusteredJets(const edm::Handle<TrackIPTagInfoCollection>& jets,
+                                 const std::vector<fastjet::PseudoJet>& matchedJets,
+                                 std::vector<int>& matchedIndices);
+       void matchReclusteredFatJets(const edm::Handle<edm::View<reco::Jet> >& jets,
+                                    const std::vector<fastjet::PseudoJet>& matchedJets,
+                                    std::vector<int>& matchedIndices);
+       void matchGroomedJets(const edm::Handle<edm::View<reco::Jet> >& jets,
+                             const edm::Handle<edm::View<reco::Jet> >& matchedJets,
+                             std::vector<int>& matchedIndices);
+       void matchSubjets(const std::vector<int>& groomedIndices,
+                         const edm::Handle<edm::View<reco::Jet> >& groomedJets,
+                         const edm::Handle<TrackIPTagInfoCollection>& subjets,
+                         std::vector<std::vector<int> >& matchedIndices);
+
 	enum ConstraintType {
 		CONSTRAINT_NONE	= 0,
 		CONSTRAINT_BEAMSPOT,
@@ -96,6 +133,18 @@ class SecondaryVertexProducer : public edm::EDProducer {
         bool                            useExternalSV;  
         double                          extSVDeltaRToJet;      
         edm::EDGetTokenT<reco::VertexCollection> token_extSVCollection;
+	bool                        useSVClustering;
+	bool                        useSVMomentum;
+	std::string                 jetAlgorithm;
+	double                      rParam;
+	double                      jetPtMin;
+	double                      ghostRescaling;
+	bool                        useFatJets;
+	edm::EDGetTokenT<edm::View<reco::Jet> > token_fatJets;
+	edm::EDGetTokenT<edm::View<reco::Jet> > token_groomedFatJets;
+	
+	ClusterSequencePtr           fjClusterSeq;
+	JetDefPtr                    fjJetDefinition;
 };
 
 SecondaryVertexProducer::ConstraintType
@@ -163,9 +212,35 @@ SecondaryVertexProducer::SecondaryVertexProducer(
         useExternalSV = false;
         if(params.existsAs<bool>("useExternalSV")) useExternalSV = params.getParameter<bool> ("useExternalSV");
         if(useExternalSV) {
-	   token_extSVCollection =  consumes<reco::VertexCollection>(params.getParameter<edm::InputTag>("extSVCollection"));
+	   token_extSVCollection =  mayConsume<reco::VertexCollection>(params.getParameter<edm::InputTag>("extSVCollection"));
        	   extSVDeltaRToJet = params.getParameter<double>("extSVDeltaRToJet");
         }
+       useSVClustering = ( params.exists("useSVClustering") ? params.getParameter<bool>("useSVClustering") : false );
+	useSVMomentum = ( params.exists("useSVMomentum") ? params.getParameter<bool>("useSVMomentum") : false );
+       useFatJets = ( useExternalSV && useSVClustering && params.exists("fatJets") && params.exists("groomedFatJets") );
+	if( useSVClustering )
+	{
+	  jetAlgorithm = params.getParameter<std::string>("jetAlgorithm");
+         rParam = params.getParameter<double>("rParam");
+         jetPtMin = 0.; // hardcoded to 0. since we simply want to recluster all input jets which already had some PtMin applied
+         ghostRescaling = ( params.exists("ghostRescaling") ? params.getParameter<double>("ghostRescaling") : 1e-18 );
+
+         // set jet algorithm
+	  if (jetAlgorithm=="Kt")
+	    fjJetDefinition = JetDefPtr( new fastjet::JetDefinition(fastjet::kt_algorithm, rParam) );
+	  else if (jetAlgorithm=="CambridgeAachen")
+	    fjJetDefinition = JetDefPtr( new fastjet::JetDefinition(fastjet::cambridge_algorithm, rParam) );
+	  else if (jetAlgorithm=="AntiKt")
+	    fjJetDefinition = JetDefPtr( new fastjet::JetDefinition(fastjet::antikt_algorithm, rParam) );
+	  else
+	    throw cms::Exception("InvalidJetAlgorithm") << "Jet clustering algorithm is invalid: " << jetAlgorithm << ", use CambridgeAachen | Kt | AntiKt" << std::endl;
+	}
+	if( useFatJets )
+	{
+	  token_fatJets = mayConsume<edm::View<reco::Jet> >(params.getParameter<edm::InputTag>("fatJets"));
+	  token_groomedFatJets = mayConsume<edm::View<reco::Jet> >(params.getParameter<edm::InputTag>("groomedFatJets"));
+	}
+	
 	produces<SecondaryVertexTagInfoCollection>();
 }
 
@@ -224,6 +299,17 @@ void SecondaryVertexProducer::produce(edm::Event &event,
         // External Sec Vertex collection (e.g. for IVF usage)
         edm::Handle<reco::VertexCollection> extSecVertex;          
         if(useExternalSV) event.getByToken(token_extSVCollection,extSecVertex);
+	 
+	edm::Handle<edm::View<reco::Jet> > fatJetsHandle;
+	edm::Handle<edm::View<reco::Jet> > groomedFatJetsHandle;
+	if( useFatJets )
+	{
+	  event.getByToken(token_fatJets, fatJetsHandle);
+	  event.getByToken(token_groomedFatJets, groomedFatJetsHandle);
+	  
+	  if( groomedFatJetsHandle->size() > fatJetsHandle->size() )
+           edm::LogError("TooManyGroomedJets") << "There are more groomed (" << groomedFatJetsHandle->size() << ") than original fat jets (" << fatJetsHandle->size() << "). Please check that the two jet collections belong to each other.";
+	}
                                                              
 
 	edm::Handle<BeamSpot> beamSpot;
@@ -257,6 +343,182 @@ void SecondaryVertexProducer::produce(edm::Event &event,
 		/* nothing */;
 	}
 
+	std::vector<std::vector<int> > clusteredSVs(trackIPTagInfos->size(),std::vector<int>());
+	if( useExternalSV && useSVClustering && trackIPTagInfos->size()>0 )
+	{
+	  // vector of constituents for reclustering jets and "ghost" SVs
+	  std::vector<fastjet::PseudoJet> fjInputs;
+	  // loop over all input jets and collect all their constituents
+	  if( useFatJets )
+	  {
+	    for(edm::View<reco::Jet>::const_iterator it = fatJetsHandle->begin(); it != fatJetsHandle->end(); ++it)
+	    {
+	      std::vector<edm::Ptr<reco::Candidate> > constituents = it->getJetConstituents();
+	      std::vector<edm::Ptr<reco::Candidate> >::const_iterator m;
+	      for( m = constituents.begin(); m != constituents.end(); ++m )
+	      {
+		 reco::CandidatePtr constit = *m;
+		 if(constit->pt() == 0)
+		 {
+		   edm::LogWarning("NullTransverseMomentum") << "dropping input candidate with pt=0";
+		   continue;
+		 }
+		 fjInputs.push_back(fastjet::PseudoJet(constit->px(),constit->py(),constit->pz(),constit->energy()));
+	      }
+	    }
+	  }
+	  else
+	  {
+	    for(TrackIPTagInfoCollection::const_iterator it = trackIPTagInfos->begin(); it != trackIPTagInfos->end(); ++it)
+	    {
+	      std::vector<edm::Ptr<reco::Candidate> > constituents = it->jet()->getJetConstituents();
+	      std::vector<edm::Ptr<reco::Candidate> >::const_iterator m;
+	      for( m = constituents.begin(); m != constituents.end(); ++m )
+	      {
+		 reco::CandidatePtr constit = *m;
+		 if(constit->pt() == 0)
+		 {
+		   edm::LogWarning("NullTransverseMomentum") << "dropping input candidate with pt=0";
+		   continue;
+		 }
+		 fjInputs.push_back(fastjet::PseudoJet(constit->px(),constit->py(),constit->pz(),constit->energy()));
+	      }
+	    }
+	  }
+	  // insert "ghost" SVs in the vector of constituents
+	  for(reco::VertexCollection::const_iterator it = extSecVertex->begin(); it != extSecVertex->end(); ++it)
+	  {
+	    const Vertex &pv = *(trackIPTagInfos->front().primaryVertex());
+	    GlobalPoint pvPosition(pv.x(),pv.y(),pv.z());
+	    GlobalPoint svPosition(it->x(),it->y(),it->z());
+	    GlobalVector dir( svPosition - pvPosition );
+	    dir = dir.unit();
+	    fastjet::PseudoJet p(dir.x(),dir.y(),dir.z(),dir.mag()); // using SV flight direction so treating SV as massless
+	    if( useSVMomentum )
+	      p = fastjet::PseudoJet(it->p4().px(),it->p4().py(),it->p4().pz(),it->p4().energy());
+	    p*=ghostRescaling; // rescale SV direction/momentum
+	    p.set_user_info(new VertexInfo( it - extSecVertex->begin() ));
+	    fjInputs.push_back(p);
+	  }
+	  
+	  // define jet clustering sequence
+	  fjClusterSeq = ClusterSequencePtr( new fastjet::ClusterSequence( fjInputs, *fjJetDefinition ) );
+	  // recluster jet constituents and inserted "ghosts"
+	  std::vector<fastjet::PseudoJet> inclusiveJets = fastjet::sorted_by_pt( fjClusterSeq->inclusive_jets(jetPtMin) );
+	  
+	  if( useFatJets )
+	  {
+	    if( inclusiveJets.size() < fatJetsHandle->size() )
+             edm::LogError("TooFewReclusteredJets") << "There are fewer reclustered (" << inclusiveJets.size() << ") than original fat jets (" << fatJetsHandle->size() << "). Please check that the jet algorithm and jet size match those used for the original jet collection.";
+
+	    // match reclustered and original fat jets
+	    std::vector<int> reclusteredIndices;
+	    matchReclusteredFatJets(fatJetsHandle,inclusiveJets,reclusteredIndices);
+
+	    // match groomed and original fat jets
+	    std::vector<int> groomedIndices;
+	    matchGroomedJets(fatJetsHandle,groomedFatJetsHandle,groomedIndices);
+
+	    // match subjets and original fat jets
+	    std::vector<std::vector<int> > subjetIndices;
+	    matchSubjets(groomedIndices,groomedFatJetsHandle,trackIPTagInfos,subjetIndices);
+	
+	    // collect clustered SVs
+	    for(size_t i=0; i<fatJetsHandle->size(); ++i)
+	    {
+	      // since the "ghosts" are extremely soft, the configuration and ordering of the reclustered and original fat jets should in principle stay the same
+	      if( ( fabs( inclusiveJets.at(reclusteredIndices.at(i)).pt() - fatJetsHandle->at(i).pt() ) / fatJetsHandle->at(i).pt() ) > 1e-3 ) // 0.1% difference in Pt should be sufficient to detect possible misconfigurations
+	      {
+		 if( fatJetsHandle->at(i).pt() < 10. )  // special handling for low-Pt jets (Pt<10 GeV)
+		   edm::LogWarning("JetPtMismatchAtLowPt") << "The reclustered and original fat jet " << i << " have different Pt's (" << inclusiveJets.at(reclusteredIndices.at(i)).pt() << " vs " << fatJetsHandle->at(i).pt() << " GeV, respectively).\n"
+								 << "Please check that the jet algorithm and jet size match those used for the original fat jet collection and also make sure the original fat jets are uncorrected. In addition, make sure you are not using CaloJets which are presently not supported.\n"
+								 << "Since the mismatch is at low Pt, it is ignored and only a warning is issued.\n"
+								 << "\nIn extremely rare instances the mismatch could be caused by a difference in the machine precision in which case make sure the original jet collection is produced and reclustering is performed in the same job.";
+		 else
+		   edm::LogError("JetPtMismatch") << "The reclustered and original fat jet " << i << " have different Pt's (" << inclusiveJets.at(reclusteredIndices.at(i)).pt() << " vs " << fatJetsHandle->at(i).pt() << " GeV, respectively).\n"
+						      << "Please check that the jet algorithm and jet size match those used for the original fat jet collection and also make sure the original fat jets are uncorrected. In addition, make sure you are not using CaloJets which are presently not supported.\n"
+						      << "\nIn extremely rare instances the mismatch could be caused by a difference in the machine precision in which case make sure the original jet collection is produced and reclustering is performed in the same job.";
+	      }
+	
+	      // get jet constituents
+	      std::vector<fastjet::PseudoJet> constituents = inclusiveJets.at(reclusteredIndices.at(i)).constituents();
+
+	      std::vector<int> svIndices;
+	      // loop over jet constituents and try to find "ghosts"
+	      for(std::vector<fastjet::PseudoJet>::const_iterator it = constituents.begin(); it != constituents.end(); ++it)
+	      {
+		 if( !it->has_user_info() ) continue; // skip if not a "ghost"
+		 
+		 svIndices.push_back( it->user_info<VertexInfo>().vertexIndex() );
+	      }
+
+	      if( subjetIndices.at(i).size()==0 ) continue; // continue if the original jet does not have subjets assigned
+	
+	      // loop over clustered SVs and assign them to different subjets based on smallest dR
+	      for(size_t sv=0; sv<svIndices.size(); ++sv)
+	      {
+               const Vertex &pv = *(trackIPTagInfos->front().primaryVertex());
+		 const Vertex &extSV = (*extSecVertex)[ svIndices.at(sv) ];
+		 GlobalPoint pvPosition(pv.x(),pv.y(),pv.z());
+		 GlobalPoint svPosition(extSV.x(),extSV.y(),extSV.z());
+		 GlobalVector dir( svPosition - pvPosition );
+		 dir = dir.unit();
+		 fastjet::PseudoJet p(dir.x(),dir.y(),dir.z(),dir.mag()); // using SV flight direction so treating SV as massless
+		 if( useSVMomentum )
+		   p = fastjet::PseudoJet(extSV.p4().px(),extSV.p4().py(),extSV.p4().pz(),extSV.p4().energy());
+		
+		 std::vector<double> dR2toSubjets;
+		
+		 for(size_t sj=0; sj<subjetIndices.at(i).size(); ++sj)
+		   dR2toSubjets.push_back( reco::deltaR2( p.rapidity(), p.phi_std(), trackIPTagInfos->at(subjetIndices.at(i).at(sj)).jet()->rapidity(), trackIPTagInfos->at(subjetIndices.at(i).at(sj)).jet()->phi() ) );
+
+		 // find the closest subjet
+		 int closestSubjetIdx = std::distance( dR2toSubjets.begin(), std::min_element(dR2toSubjets.begin(), dR2toSubjets.end()) );
+
+		 clusteredSVs.at(subjetIndices.at(i).at(closestSubjetIdx)).push_back( svIndices.at(sv) );
+	      }
+	    }
+	  }
+	  else
+	  {
+	    if( inclusiveJets.size() < trackIPTagInfos->size() )
+             edm::LogError("TooFewReclusteredJets") << "There are fewer reclustered (" << inclusiveJets.size() << ") than original jets (" << trackIPTagInfos->size() << "). Please check that the jet algorithm and jet size match those used for the original jet collection.";
+	
+	    // match reclustered and original jets
+           std::vector<int> reclusteredIndices;
+           matchReclusteredJets(trackIPTagInfos,inclusiveJets,reclusteredIndices);
+	
+	    // collect clustered SVs
+	    for(size_t i=0; i<trackIPTagInfos->size(); ++i)
+	    {
+	      // since the "ghosts" are extremely soft, the configuration and ordering of the reclustered and original jets should in principle stay the same
+	      if( ( fabs( inclusiveJets.at(reclusteredIndices.at(i)).pt() - trackIPTagInfos->at(i).jet()->pt() ) / trackIPTagInfos->at(i).jet()->pt() ) > 1e-3 ) // 0.1% difference in Pt should be sufficient to detect possible misconfigurations
+	      {
+		 if( trackIPTagInfos->at(i).jet()->pt() < 10. )  // special handling for low-Pt jets (Pt<10 GeV)
+		   edm::LogWarning("JetPtMismatchAtLowPt") << "The reclustered and original jet " << i << " have different Pt's (" << inclusiveJets.at(reclusteredIndices.at(i)).pt() << " vs " << trackIPTagInfos->at(i).jet()->pt() << " GeV, respectively).\n"
+								 << "Please check that the jet algorithm and jet size match those used for the original jet collection and also make sure the original jets are uncorrected. In addition, make sure you are not using CaloJets which are presently not supported.\n"
+								 << "Since the mismatch is at low Pt, it is ignored and only a warning is issued.\n"
+								 << "\nIn extremely rare instances the mismatch could be caused by a difference in the machine precision in which case make sure the original jet collection is produced and reclustering is performed in the same job.";
+		 else
+		   edm::LogError("JetPtMismatch") << "The reclustered and original jet " << i << " have different Pt's (" << inclusiveJets.at(reclusteredIndices.at(i)).pt() << " vs " << trackIPTagInfos->at(i).jet()->pt() << " GeV, respectively).\n"
+						      << "Please check that the jet algorithm and jet size match those used for the original jet collection and also make sure the original jets are uncorrected. In addition, make sure you are not using CaloJets which are presently not supported.\n"
+						      << "\nIn extremely rare instances the mismatch could be caused by a difference in the machine precision in which case make sure the original jet collection is produced and reclustering is performed in the same job.";
+	      }
+	
+	      // get jet constituents
+	      std::vector<fastjet::PseudoJet> constituents = inclusiveJets.at(reclusteredIndices.at(i)).constituents();
+
+	      // loop over jet constituents and try to find "ghosts"
+	      for(std::vector<fastjet::PseudoJet>::const_iterator it = constituents.begin(); it != constituents.end(); ++it)
+	      {
+		 if( !it->has_user_info() ) continue; // skip if not a "ghost"
+		 // push back clustered SV indices
+		 clusteredSVs.at(i).push_back( it->user_info<VertexInfo>().vertexIndex() );
+	      }
+	    }
+	  }
+	}
+	
 	std::auto_ptr<ConfigurableVertexReconstructor> vertexReco;
 	std::auto_ptr<GhostTrackVertexFinder> vertexRecoGT;
 	if (useGhostTrack)
@@ -469,16 +731,31 @@ void SecondaryVertexProducer::produce(edm::Event &event,
 
 		// clean up now unneeded collections
              }else{
-                  for(size_t iExtSv = 0; iExtSv < extSecVertex->size(); iExtSv++){
-		      const reco::Vertex & extVertex = (*extSecVertex)[iExtSv];
-//    	              GlobalVector vtxDir = GlobalVector(extVertex.p4().X(),extVertex.p4().Y(),extVertex.p4().Z());
-//                     if(Geom::deltaR(extVertex.position() - pv.position(), vtxDir)>0.2) continue; //pointing angle
-//		      std::cout << " dR " << iExtSv << " " << Geom::deltaR( ( extVertex.position() - pv.position() ), jetDir ) << "eta: " << ( extVertex.position() - pv.position()).eta() << " vs " << jetDir.eta() << " phi: "  << ( extVertex.position() - pv.position()).phi() << " vs  " << jetDir.phi() <<  std::endl; 
-	              if( Geom::deltaR( ( extVertex.position() - pv.position() ), jetDir ) >  extSVDeltaRToJet || extVertex.p4().M() < 0.3)
-                	continue;
-//		      std::cout << " SV added " << iExtSv << std::endl; 
- 		      extAssoCollection.push_back( extVertex );
-                   }
+		    if( !useSVClustering ) {
+		
+		      for(size_t iExtSv = 0; iExtSv < extSecVertex->size(); iExtSv++){
+			 const reco::Vertex & extVertex = (*extSecVertex)[iExtSv];
+  //    	              GlobalVector vtxDir = GlobalVector(extVertex.p4().X(),extVertex.p4().Y(),extVertex.p4().Z());
+  //                     if(Geom::deltaR(extVertex.position() - pv.position(), vtxDir)>0.2) continue; //pointing angle
+  //		      std::cout << " dR " << iExtSv << " " << Geom::deltaR( ( extVertex.position() - pv.position() ), jetDir ) << "eta: " << ( extVertex.position() - pv.position()).eta() << " vs " << jetDir.eta() << " phi: "  << ( extVertex.position() - pv.position()).phi() << " vs  " << jetDir.phi() <<  std::endl; 
+			  if( reco::deltaR( ( extVertex.position() - pv.position() ), jetDir ) >  extSVDeltaRToJet || extVertex.p4().M() < 0.3)
+			  continue;
+  //		      std::cout << " SV added " << iExtSv << std::endl; 
+			 extAssoCollection.push_back( extVertex );
+		      }
+		
+		    }
+                  else {
+		
+		      size_t jetIdx = ( iterJets - trackIPTagInfos->begin() );
+		
+		      for(size_t iExtSv = 0; iExtSv < clusteredSVs.at(jetIdx).size(); iExtSv++){
+			 const reco::Vertex & extVertex = (*extSecVertex)[ clusteredSVs.at(jetIdx).at(iExtSv) ];
+			
+			 extAssoCollection.push_back( extVertex );
+		      }
+		    }
+		
                    SVBuilder svBuilder(pv, jetDir, withPVError);
 	           std::remove_copy_if(boost::make_transform_iterator( extAssoCollection.begin(), svBuilder),
                                 boost::make_transform_iterator(extAssoCollection.end(), svBuilder),
@@ -549,6 +826,179 @@ void SecondaryVertexProducer::produce(edm::Event &event,
 	}
 
 	event.put(tagInfos);
+}
+
+// ------------ method that matches reclustered and original jets based on minimum dR ------------
+void
+SecondaryVertexProducer::matchReclusteredJets(const edm::Handle<TrackIPTagInfoCollection>& jets,
+                                              const std::vector<fastjet::PseudoJet>& reclusteredJets,
+                                              std::vector<int>& matchedIndices)
+{
+   std::vector<bool> matchedLocks(reclusteredJets.size(),false);
+
+   for(size_t j=0; j<jets->size(); ++j)
+   {
+     double matchedDR2 = 1e9;
+     int matchedIdx = -1;
+
+     for(size_t rj=0; rj<reclusteredJets.size(); ++rj)
+     {
+       if( matchedLocks.at(rj) ) continue; // skip jets that have already been matched
+
+       double tempDR2 = reco::deltaR2( jets->at(j).jet()->rapidity(), jets->at(j).jet()->phi(), reclusteredJets.at(rj).rapidity(), reclusteredJets.at(rj).phi_std() );
+       if( tempDR2 < matchedDR2 )
+       {
+         matchedDR2 = tempDR2;
+         matchedIdx = rj;
+       }
+     }
+
+     if( matchedIdx>=0 )
+     {
+       if ( matchedDR2 > rParam*rParam )
+       {
+         edm::LogError("JetMatchingFailed") << "Matched reclustered jet " << matchedIdx << " and original jet " << j <<" are separated by dR=" << sqrt(matchedDR2) << " which is greater than the jet size R=" << rParam << ".\n"
+                                            << "This is not expected so please check that the jet algorithm and jet size match those used for the original jet collection.";
+       }
+       else
+         matchedLocks.at(matchedIdx) = true;
+     }
+     else
+       edm::LogError("JetMatchingFailed") << "Matching reclustered to original jets failed. Please check that the jet algorithm and jet size match those used for the original jet collection.";
+
+     matchedIndices.push_back(matchedIdx);
+   }
+}
+
+// ------------ method that matches reclustered and original fat jets based on minimum dR ------------
+void
+SecondaryVertexProducer::matchReclusteredFatJets(const edm::Handle<edm::View<reco::Jet> >& jets,
+                                                 const std::vector<fastjet::PseudoJet>& reclusteredJets,
+                                                 std::vector<int>& matchedIndices)
+{
+   std::vector<bool> matchedLocks(reclusteredJets.size(),false);
+
+   for(size_t j=0; j<jets->size(); ++j)
+   {
+     double matchedDR2 = 1e9;
+     int matchedIdx = -1;
+
+     for(size_t rj=0; rj<reclusteredJets.size(); ++rj)
+     {
+       if( matchedLocks.at(rj) ) continue; // skip jets that have already been matched
+
+       double tempDR2 = reco::deltaR2( jets->at(j).rapidity(), jets->at(j).phi(), reclusteredJets.at(rj).rapidity(), reclusteredJets.at(rj).phi_std() );
+       if( tempDR2 < matchedDR2 )
+       {
+         matchedDR2 = tempDR2;
+         matchedIdx = rj;
+       }
+     }
+
+     if( matchedIdx>=0 )
+     {
+       if ( matchedDR2 > rParam*rParam )
+       {
+         edm::LogError("JetMatchingFailed") << "Matched reclustered jet " << matchedIdx << " and original jet " << j <<" are separated by dR=" << sqrt(matchedDR2) << " which is greater than the jet size R=" << rParam << ".\n"
+                                            << "This is not expected so please check that the jet algorithm and jet size match those used for the original jet collection.";
+       }
+       else
+         matchedLocks.at(matchedIdx) = true;
+     }
+     else
+       edm::LogError("JetMatchingFailed") << "Matching reclustered to original fat jets failed. Please check that the jet algorithm and jet size match those used for the original fat jet collection.";
+
+     matchedIndices.push_back(matchedIdx);
+   }
+}
+
+// ------------ method that matches groomed and original jets based on minimum dR ------------
+void
+SecondaryVertexProducer::matchGroomedJets(const edm::Handle<edm::View<reco::Jet> >& jets,
+                                          const edm::Handle<edm::View<reco::Jet> >& groomedJets,
+                                          std::vector<int>& matchedIndices)
+{
+   std::vector<bool> jetLocks(jets->size(),false);
+   std::vector<int>  jetIndices;
+
+   for(size_t gj=0; gj<groomedJets->size(); ++gj)
+   {
+     double matchedDR2 = 1e9;
+     int matchedIdx = -1;
+
+     if( groomedJets->at(gj).pt()>0. ) // skips pathological cases of groomed jets with Pt=0
+     {
+       for(size_t j=0; j<jets->size(); ++j)
+       {
+         if( jetLocks.at(j) ) continue; // skip jets that have already been matched
+
+         double tempDR2 = reco::deltaR2( jets->at(j).rapidity(), jets->at(j).phi(), groomedJets->at(gj).rapidity(), groomedJets->at(gj).phi() );
+         if( tempDR2 < matchedDR2 )
+         {
+           matchedDR2 = tempDR2;
+           matchedIdx = j;
+         }
+       }
+     }
+
+     if( matchedIdx>=0 )
+     {
+       if ( matchedDR2 > rParam*rParam )
+       {
+         edm::LogWarning("MatchedJetsFarApart") << "Matched groomed jet " << gj << " and original jet " << matchedIdx <<" are separated by dR=" << sqrt(matchedDR2) << " which is greater than the jet size R=" << rParam << ".\n"
+                                                << "This is not expected so the matching of these two jets has been discarded. Please check that the two jet collections belong to each other.";
+         matchedIdx = -1;
+       }
+       else
+         jetLocks.at(matchedIdx) = true;
+     }
+     jetIndices.push_back(matchedIdx);
+   }
+
+   for(size_t j=0; j<jets->size(); ++j)
+   {
+     std::vector<int>::iterator matchedIndex = std::find( jetIndices.begin(), jetIndices.end(), j );
+
+     matchedIndices.push_back( matchedIndex != jetIndices.end() ? std::distance(jetIndices.begin(),matchedIndex) : -1 );
+   }
+}
+
+// ------------ method that matches subjets and original fat jets ------------
+void
+SecondaryVertexProducer::matchSubjets(const std::vector<int>& groomedIndices,
+                                      const edm::Handle<edm::View<reco::Jet> >& groomedJets,
+                                      const edm::Handle<TrackIPTagInfoCollection>& subjets,
+                                      std::vector<std::vector<int> >& matchedIndices)
+{
+   for(size_t g=0; g<groomedIndices.size(); ++g)
+   {
+     std::vector<int> subjetIndices;
+
+     if( groomedIndices.at(g)>=0 )
+     {
+       for(size_t s=0; s<groomedJets->at(groomedIndices.at(g)).numberOfDaughters(); ++s)
+       {
+         const edm::Ptr<reco::Candidate> & subjet = groomedJets->at(groomedIndices.at(g)).daughterPtr(s);
+
+         for(size_t sj=0; sj<subjets->size(); ++sj)
+         {
+	    const edm::RefToBase<reco::Jet> &subjetRef = subjets->at(sj).jet();
+           if( subjet == edm::Ptr<reco::Candidate>( subjetRef.id(), subjetRef.get(), subjetRef.key() ) )
+           {
+             subjetIndices.push_back(sj);
+             break;
+           }
+         }
+       }
+
+       if( subjetIndices.size() == 0 )
+         edm::LogError("SubjetMatchingFailed") << "Matching subjets to original fat jets failed. Please check that the groomed fat jet and subjet collections belong to each other.";
+
+       matchedIndices.push_back(subjetIndices);
+     }
+     else
+       matchedIndices.push_back(subjetIndices);
+   }
 }
 
 //define this as a plug-in

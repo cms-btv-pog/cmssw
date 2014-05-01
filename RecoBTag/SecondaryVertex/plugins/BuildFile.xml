@@ -14,7 +14,9 @@
    <use name="TrackingTools/TransientTrack"/>
    <use name="RecoVertex/ConfigurableVertexReco"/>
    <use name="RecoVertex/GhostTrackFitter"/>
+   <use name="fastjet"/>
    <flags EDM_PLUGIN="1"/>
+   #<flags CXXFLAGS="-O0 -g -fno-inline"/>
 </library>
 
 <library file="JetTagESProducers.cc" name="RecoBTagSecondaryVertexESProducers">
