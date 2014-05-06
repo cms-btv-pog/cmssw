@@ -85,7 +85,11 @@ class BTagPerformanceAnalyzerOnData : public edm::EDAnalyzer {
 
   unsigned int mcPlots_;
 
+  //add consumes
+<<<<<<< HEAD
+=======
   edm::EDGetTokenT<GenEventInfoProduct> genToken;
+>>>>>>> Backport from 70x/71x releases (JEC onfly, PU classification...)
   edm::EDGetTokenT<reco::SoftLeptonTagInfoCollection> slInfoToken;
   std::vector< edm::EDGetTokenT<reco::JetTagCollection> > jetTagToken;
   std::vector< std::pair<edm::EDGetTokenT<reco::JetTagCollection>, edm::EDGetTokenT<reco::JetTagCollection>> > tagCorrelationToken;
