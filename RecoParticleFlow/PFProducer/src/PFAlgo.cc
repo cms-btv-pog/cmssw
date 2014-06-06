@@ -1946,6 +1946,7 @@ void PFAlgo::processBlock( const reco::PFBlockRef& blockref,
       case TrackBase::iter2:
       case TrackBase::iter3:
       case TrackBase::iter4:
+      case TrackBase::iter7:
 	blowError = 1.;
 	break;
       case TrackBase::iter5:
@@ -2403,6 +2404,7 @@ void PFAlgo::processBlock( const reco::PFBlockRef& blockref,
 	case TrackBase::iter2:
 	case TrackBase::iter3:
 	case TrackBase::iter4:
+	case TrackBase::iter7:
 	  break;
 	case TrackBase::iter5:
 	case TrackBase::iter6:
