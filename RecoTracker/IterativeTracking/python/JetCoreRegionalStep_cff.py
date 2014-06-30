@@ -5,11 +5,11 @@ import FWCore.ParameterSet.Config as cms
 # run only if there are high pT jets
 from RecoJets.JetProducers.TracksForJets_cff import trackRefsForJets
 iter0TrackRefsForJets = trackRefsForJets.clone(src = cms.InputTag('initialStepTracks'))
-from RecoJets.JetProducers.ak4CaloJets_cfi import ak4CaloJets
+from RecoJets.JetProducers.ak5CaloJets_cfi import ak5CaloJets
 from RecoLocalCalo.CaloTowersCreator.calotowermaker_cfi import calotowermaker
 caloTowerForTrk = calotowermaker.clone(hbheInput=cms.InputTag('hbheprereco'))
-ak4CaloJetsForTrk = ak4CaloJets.clone(srcPVs = cms.InputTag('pixelVertices'), src= cms.InputTag('caloTowerForTrk'))
-jetsForCoreTracking = cms.EDFilter("CandPtrSelector", src = cms.InputTag("ak4CaloJetsForTrk"), cut = cms.string("pt > 100 && abs(eta) < 2.5"))
+ak5CaloJetsForTrk = ak5CaloJets.clone(srcPVs = cms.InputTag('pixelVertices'), src= cms.InputTag('caloTowerForTrk'))
+jetsForCoreTracking = cms.EDFilter("CandPtrSelector", src = cms.InputTag("ak5CaloJetsForTrk"), cut = cms.string("pt > 100 && abs(eta) < 2.5"))
 
 # care only at tracks from main PV
 import RecoVertex.PrimaryVertexProducer.OfflinePrimaryVertices_cfi
@@ -99,8 +99,8 @@ jetCoreRegionalStepChi2Est = TrackingTools.KalmanUpdators.Chi2MeasurementEstimat
 )
 
 # TRACK BUILDING
-import RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilder_cfi
-jetCoreRegionalStepTrajectoryBuilder = RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilder_cfi.GroupedCkfTrajectoryBuilder.clone(
+import RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi
+jetCoreRegionalStepTrajectoryBuilder = RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi.GroupedCkfTrajectoryBuilder.clone(
     MeasurementTrackerName = '',
     trajectoryFilter = cms.PSet(refToPSet_ = cms.string('jetCoreRegionalStepTrajectoryFilter')),
     #clustersToSkip = cms.InputTag('jetCoreRegionalStepClusters'),
@@ -152,7 +152,7 @@ jetCoreRegionalStepSelector = RecoTracker.FinalTrackSelectors.multiTrackSelector
     ) #end of clone
 
 # Final sequence
-JetCoreRegionalStep = cms.Sequence(iter0TrackRefsForJets*caloTowerForTrk*ak4CaloJetsForTrk*jetsForCoreTracking*
+JetCoreRegionalStep = cms.Sequence(iter0TrackRefsForJets*caloTowerForTrk*ak5CaloJetsForTrk*jetsForCoreTracking*
                                    firstStepPrimaryVertices*
                                    firstStepGoodPrimaryVertices*
                                    #jetCoreRegionalStepClusters*
