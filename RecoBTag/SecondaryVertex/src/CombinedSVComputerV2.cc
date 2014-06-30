@@ -386,10 +386,10 @@ CombinedSVComputerV2::operator () (const TrackIPTagInfo &ipInfo,
 		vars.insert(btau::muonMultiplicity,pfJet->muonMultiplicity(), true);
 		vars.insert(btau::hadronMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity(), true);
 		vars.insert(btau::hadronPhotonMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity(), true);
-			vars.insert(btau::totalMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity()+pfJet->electronMultiplicity()+pfJet->muonMultiplicity(), true);
+		vars.insert(btau::totalMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity()+pfJet->electronMultiplicity()+pfJet->muonMultiplicity(), true);
 
 	}
-	else if( patJet != 0)
+	else if( patJet != 0 && patJet->isPFJet() )
 	{
 		vars.insert(btau::chargedHadronEnergyFraction,patJet->chargedHadronEnergyFraction(), true);
 		vars.insert(btau::neutralHadronEnergyFraction,patJet->neutralHadronEnergyFraction(), true);
@@ -403,12 +403,24 @@ CombinedSVComputerV2::operator () (const TrackIPTagInfo &ipInfo,
 		vars.insert(btau::muonMultiplicity,patJet->muonMultiplicity(), true);
 		vars.insert(btau::hadronMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity(), true);
 		vars.insert(btau::hadronPhotonMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity(), true);
-			vars.insert(btau::totalMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity()+patJet->electronMultiplicity()+patJet->muonMultiplicity(), true);
+		vars.insert(btau::totalMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity()+patJet->electronMultiplicity()+patJet->muonMultiplicity(), true);
 	
 	}
 	else
 	{
-		throw cms::Exception("InvalidConfiguration") << "From CombinedSVComputerV2::operator: reco::PFJet OR pat::Jet are required by this module" << std::endl;	
+                vars.insert(btau::chargedHadronEnergyFraction,0., true);
+                vars.insert(btau::neutralHadronEnergyFraction,0., true);
+                vars.insert(btau::photonEnergyFraction,0., true);
+                vars.insert(btau::electronEnergyFraction,0., true);
+                vars.insert(btau::muonEnergyFraction,0., true);
+                vars.insert(btau::chargedHadronMultiplicity,0, true);
+                vars.insert(btau::neutralHadronMultiplicity,0, true);
+                vars.insert(btau::photonMultiplicity,0, true);
+                vars.insert(btau::electronMultiplicity,0, true);
+                vars.insert(btau::muonMultiplicity,0, true);
+                vars.insert(btau::hadronMultiplicity,0, true);
+                vars.insert(btau::hadronPhotonMultiplicity,0, true);
+                vars.insert(btau::totalMultiplicity,0, true);
 	}
  
 	vars.finalize();
