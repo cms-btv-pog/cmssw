@@ -86,9 +86,10 @@ jetCoreRegionalStepSeeds.SeedCreatorPSet.forceKinematicWithRegionDirection = cms
 
 # QUALITY CUTS DURING TRACK BUILDING
 import TrackingTools.TrajectoryFiltering.TrajectoryFilter_cff
-jetCoreRegionalStepTrajectoryFilter = TrackingTools.TrajectoryFiltering.TrajectoryFilter_cff.CkfBaseTrajectoryFilter_block.clone(
-    minimumNumberOfHits = 3,
-    minPt = 0.1
+jetCoreRegionalStepTrajectoryFilter = TrackingTools.TrajectoryFiltering.TrajectoryFilterESProducer_cfi.trajectoryFilterESProducer.clone(
+    ComponentName = cms.string('jetCoreRegionalStepTrajectoryFilter'),
+#    minimumNumberOfHits = 3,
+#    minPt = 0.1
 )
 
 import TrackingTools.KalmanUpdators.Chi2MeasurementEstimatorESProducer_cfi
@@ -102,7 +103,9 @@ jetCoreRegionalStepChi2Est = TrackingTools.KalmanUpdators.Chi2MeasurementEstimat
 import RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi
 jetCoreRegionalStepTrajectoryBuilder = RecoTracker.CkfPattern.GroupedCkfTrajectoryBuilderESProducer_cfi.GroupedCkfTrajectoryBuilder.clone(
     MeasurementTrackerName = '',
-    trajectoryFilter = cms.PSet(refToPSet_ = cms.string('jetCoreRegionalStepTrajectoryFilter')),
+    ComponentName = cms.string('jetCoreRegionalStepTrajectoryBuilder'),
+    trajectoryFilterName = 'jetCoreRegionalStepTrajectoryFilter',
+#cms.PSet(refToPSet_ = cms.string('jetCoreRegionalStepTrajectoryFilter')),
     #clustersToSkip = cms.InputTag('jetCoreRegionalStepClusters'),
     maxCand = 50,
     estimator = cms.string('jetCoreRegionalStepChi2Est'),
@@ -115,7 +118,9 @@ import RecoTracker.CkfPattern.CkfTrackCandidates_cfi
 jetCoreRegionalStepTrackCandidates = RecoTracker.CkfPattern.CkfTrackCandidates_cfi.ckfTrackCandidates.clone(
     src = cms.InputTag('jetCoreRegionalStepSeeds'),
     maxSeedsBeforeCleaning = cms.uint32(10000),
-    TrajectoryBuilderPSet = cms.PSet( refToPSet_ = cms.string('jetCoreRegionalStepTrajectoryBuilder')),
+    TrajectoryBuilder = 'jetCoreRegionalStepTrajectoryBuilder',
+# >71X version:
+#    TrajectoryBuilderPSet = cms.PSet( refToPSet_ = cms.string('jetCoreRegionalStepTrajectoryBuilder')),
     NavigationSchool = cms.string('SimpleNavigationSchool'),
     ### these two parameters are relevant only for the CachingSeedCleanerBySharedInput
     #numHitsForSeedCleaner = cms.int32(50),
