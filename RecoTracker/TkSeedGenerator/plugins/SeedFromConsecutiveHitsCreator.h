@@ -24,9 +24,10 @@ public:
   // we should get rid of the boolean parameter useSimpleMF,
   // and use only a string magneticField [instead of SimpleMagneticField]
   // or better an edm::ESInputTag (at the moment HLT does not handle ESInputTag)
-    , useSimpleMF_(false)
-    , mfName_("")
-    {  
+      , useSimpleMF_(false)
+      , mfName_("")
+      , forceKinematicWithRegionDirection_(cfg.existsAs<bool>("forceKinematicWithRegionDirection") ? cfg.getParameter<bool>("forceKinematicWithRegionDirection") : false)
+    {
       if (cfg.exists("SimpleMagneticField")) {
 	useSimpleMF_ = true;
 	mfName_ = cfg.getParameter<std::string>("SimpleMagneticField");
@@ -40,7 +41,9 @@ public:
     , theBOFFMomentum(seedMomentumForBOFF)
     , theOriginTransverseErrorMultiplier(aOriginTransverseErrorMultiplier)
     , theMinOneOverPtError(aMinOneOverPtError)
-    , useSimpleMF_(false) { }
+    , useSimpleMF_(false)
+    , forceKinematicWithRegionDirection_(false)
+  { }
 
   //dtor
   virtual ~SeedFromConsecutiveHitsCreator();
@@ -50,7 +53,7 @@ public:
 	       const edm::EventSetup& es,
 	       const SeedComparitor *filter) GCC11_FINAL;
 
-  // make job 
+  // make job
   // fill seedCollection with the "TrajectorySeed"
   virtual void makeSeed(TrajectorySeedCollection & seedCollection,
 			const SeedingHitSet & hits) GCC11_FINAL;
@@ -66,9 +69,8 @@ private:
       const TrajectoryStateOnSurface &tsos,
       const TransientTrackingRecHit::ConstRecHitPointer &hit) const dso_hidden;  
 
-  
   CurvilinearTrajectoryError initialError(float sin2Theta) const  dso_hidden;
-  
+
   void buildSeed(TrajectorySeedCollection & seedCollection,
 				   const SeedingHitSet & hits,
 				   const FreeTrajectoryState & fts) const  dso_hidden;
@@ -76,13 +78,14 @@ private:
   TransientTrackingRecHit::RecHitPointer refitHit(const TransientTrackingRecHit::ConstRecHitPointer &hit, 
 						  const TrajectoryStateOnSurface &state) const  dso_hidden;
 
+
 protected:
 
   std::string thePropagatorLabel;
   double theBOFFMomentum;
   double theOriginTransverseErrorMultiplier;
   double theMinOneOverPtError;
-  
+
   const TrackingRegion * region = nullptr;
   const SeedComparitor *filter = nullptr;
   edm::ESHandle<TrackerGeometry> tracker;
@@ -92,5 +95,7 @@ protected:
   bool isBOFF = false;
   bool useSimpleMF_;
   std::string mfName_;
+  bool forceKinematicWithRegionDirection_;
+
 };
-#endif 
+#endif
