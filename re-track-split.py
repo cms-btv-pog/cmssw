@@ -62,7 +62,7 @@ process.IdealsiPixelClusters = cms.EDProducer(
     )
 
 #this is needed if we run off RECO, comment it if you run RECO in this job
-process.caloTowerForTrk = calotowermaker.clone(hbheInput=cms.InputTag('hbhereco'))
+process.caloTowerForTrk = process.calotowermaker.clone(hbheInput=cms.InputTag('hbhereco'))
 
 process.p = cms.Path(process.IdealsiPixelClusters*process.siPixelClusters*process.MeasurementTrackerEvent+process.siPixelRecHits+process.siStripMatchedRecHits+process.ckftracks_wodEdX+process.offlinePrimaryVertices+process.ak5JetTracksAssociatorAtVertexPF*process.btagging)
 # process.reconstruction_fromRECO)
