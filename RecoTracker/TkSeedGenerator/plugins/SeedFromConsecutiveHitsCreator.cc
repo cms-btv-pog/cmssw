@@ -58,19 +58,22 @@ void SeedFromConsecutiveHitsCreator::makeSeed(TrajectorySeedCollection & seedCol
      if(etaPhiRegion) {  
 
 	//the following completely reset the kinematics, perhaps it makes no sense and newKine=kine would do better 
-   	GlobalVector direction=region->direction()/region->direction().mag();
-   	GlobalVector momentum=direction*fts.momentum().mag();
+   	//GlobalVector direction=region->direction()/region->direction().mag();
+   	//GlobalVector momentum=direction*fts.momentum().mag();
+   	//invert logic, fix direction and take 10 GeV momentum
+   	GlobalVector direction=fts.momentum()/fts.momentum().mag();
+   	GlobalVector momentum=direction*10.;
    	GlobalPoint position=region->origin()+5*direction;  
    	GlobalTrajectoryParameters newKine(position,momentum,fts.charge(),&fts.parameters().magneticField());
 
   	GlobalError vertexErr( sqr(region->originRBound()), 0, sqr(region->originRBound()),
                    0, 0, sqr(region->originZBound()));
 
-  	float ptMin = region->ptMin();
+  	//float ptMin = region->ptMin();
   	AlgebraicSymMatrix55 C = ROOT::Math::SMatrixIdentity();
 
-  	float minC00 = 0.4;
-  	C[0][0] = std::max(sin2Theta/sqr(ptMin), minC00);
+  	float minC00 = 0.1*0.1; // from 1/10GeV = 0.1 we are 1sigma away from inf momentum and 5 GeV, and 2 sigma away from 3 GeV
+  	C[0][0] = minC00;//std::max(sin2Theta/sqr(ptMin), minC00);
   	float zErr = vertexErr.czz();
   	float transverseErr = vertexErr.cxx(); // assume equal cxx cyy
         float deltaEta = (etaPhiRegion->etaRange().first-etaPhiRegion->etaRange().second)/2.;
