@@ -72,11 +72,11 @@ supportedBtagDiscr = {
   , 'doubleSecondaryVertexHighEffBJetTags'                  : ['inclusiveSecondaryVertexFinderFilteredTagInfos']
   , 'combinedInclusiveSecondaryVertexBJetTags'              : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos']
   , 'combinedInclusiveSecondaryVertexPositiveBJetTags'      : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos']
+  , 'combinedInclusiveSecondaryVertexV2BJetTags'            : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos']
   #, 'combinedMVABJetTags'                                   : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   , 'positiveCombinedMVABJetTags'                           : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   , 'negativeCombinedMVABJetTags'                           : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   #, 'combinedSecondaryVertexSoftPFLeptonV1BJetTags'         : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   #, 'positiveCombinedSecondaryVertexSoftPFLeptonV1BJetTags' : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   #, 'negativeCombinedSecondaryVertexSoftPFLeptonV1BJetTags' : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
-  , 'combinedSecondaryVertexV2BJetTags'                     : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos']
   }
