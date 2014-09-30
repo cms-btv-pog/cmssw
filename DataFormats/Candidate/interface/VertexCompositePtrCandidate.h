@@ -11,26 +11,27 @@
  */
 #include "DataFormats/Candidate/interface/VertexCompositePtrCandidateFwd.h"
 #include "DataFormats/Candidate/interface/CompositePtrCandidate.h"
+#include "DataFormats/TrackReco/interface/Track.h"
 
 namespace reco {
   class VertexCompositePtrCandidate : public CompositePtrCandidate {
   public:
-    VertexCompositePtrCandidate() : CompositePtrCandidate() { }
+    VertexCompositePtrCandidate() : CompositePtrCandidate(), createdTrack_(false), hasTrack_(false) { }
     /// constructor from values
     VertexCompositePtrCandidate(Charge q, const LorentzVector & p4, const Point & vtx,
 			     int pdgId = 0, int status = 0, bool integerCharge = true) :
       CompositePtrCandidate(q, p4, vtx, pdgId, status, integerCharge),
-      chi2_(0), ndof_(0) { }
+      chi2_(0), ndof_(0), createdTrack_(false), hasTrack_(false) { }
     /// constructor from values
     VertexCompositePtrCandidate(Charge q, const LorentzVector & p4, const Point & vtx,
 			     const CovarianceMatrix & err, double chi2, double ndof,
 			     int pdgId = 0, int status = 0, bool integerCharge = true);
      /// constructor from values
     explicit VertexCompositePtrCandidate(const Candidate & p) :
-      CompositePtrCandidate(p), chi2_(0), ndof_(0) { }
+      CompositePtrCandidate(p), chi2_(0), ndof_(0), createdTrack_(false), hasTrack_(false) { }
      /// constructor from values
     explicit VertexCompositePtrCandidate(const CompositePtrCandidate & p) :
-      CompositePtrCandidate(p), chi2_(0), ndof_(0) { }
+      CompositePtrCandidate(p), chi2_(0), ndof_(0), createdTrack_(false), hasTrack_(false) { }
     /// destructor
     virtual ~VertexCompositePtrCandidate();
     /// returns a clone of the candidate
@@ -59,6 +60,25 @@ namespace reco {
     }
     /// set covariance matrix
     void setCovariance(const CovarianceMatrix &m);
+    /// return a pointer to the track if present. otherwise, return a null pointer
+    virtual const reco::Track* bestTrack() const {
+      if (!createdTrack_) {
+        createTrack();
+        if (hasTrack_)
+          return &track_;
+        else
+          return nullptr;
+      }
+      else {
+        if (hasTrack_)
+          return &track_;
+        else
+          return nullptr;
+      }
+    }
+
+  protected:
+    void createTrack() const;
 
   private:
     /// chi-sqared
@@ -72,6 +92,12 @@ namespace reco {
       int a = (i <= j ? i : j), b = (i <= j ? j : i);
       return b * (b + 1)/2 + a;
     }
+    /// reco::Track
+    mutable reco::Track track_;
+    /// has the track creation been run
+    mutable bool createdTrack_;
+    /// does the track exist
+    mutable bool hasTrack_;
   };
 
 }
