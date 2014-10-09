@@ -35,7 +35,9 @@
   <class name="reco::CompositeCandidate" ClassVersion="10">
    <version ClassVersion="10" checksum="2953566340"/>
   </class>
-  <class name="reco::VertexCompositePtrCandidate" ClassVersion="10">
+  <class name="reco::VertexCompositePtrCandidate" ClassVersion="11">
+   <field name="track_" transient="true"/>
+   <version ClassVersion="11" checksum="327929934"/>
    <version ClassVersion="10" checksum="955269040"/>
   </class>
   <class name="reco::VertexCompositeCandidate" ClassVersion="10">
