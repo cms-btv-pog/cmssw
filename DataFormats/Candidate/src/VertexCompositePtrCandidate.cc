@@ -56,7 +56,7 @@ void VertexCompositePtrCandidate::createTrack() const {
         }
       }
 
-     AlgebraicMatrix65 jac = jacobians::jacobianCurvilinearToCartesian(GlobalVector(track->px(),track->py(),track->pz()),track->charge());
+     AlgebraicMatrix65 jac = jacobianCurvilinearToCartesian(GlobalVector(track->px(),track->py(),track->pz()),track->charge());
       // tranform 5x5 curvilinear to 6x6 Cartesian covariance matrix and add it to the total covariance matrix
       totCartError += ROOT::Math::Similarity(jac, curvError);
     }
@@ -78,7 +78,7 @@ void VertexCompositePtrCandidate::createTrack() const {
       }
     }
 
-    AlgebraicMatrix56 jac = jacobians::jacobianCartesianToCurvilinear(GlobalVector(px(),py(),pz()),0);
+    AlgebraicMatrix56 jac = jacobianCartesianToCurvilinear(GlobalVector(px(),py(),pz()),0);
     // tranform 6x6 Cartesian to 5x5 curvilinear covariance matrix and put it in the appropriate format for the track creation
     AlgebraicSymMatrix55 curvError = ROOT::Math::Similarity(jac, cartError);
     reco::TrackBase::CovarianceMatrix m;
