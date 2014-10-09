@@ -1,8 +1,5 @@
 #include "DataFormats/Candidate/interface/VertexCompositePtrCandidate.h"
-#include "MagneticField/UniformEngine/src/UniformMagneticField.h"
-#include "TrackingTools/TrajectoryParametrization/interface/GlobalTrajectoryParameters.h"
-#include "TrackingTools/AnalyticalJacobians/interface/JacobianCurvilinearToCartesian.h"
-#include "TrackingTools/AnalyticalJacobians/interface/JacobianCartesianToCurvilinear.h"
+#include "DataFormats/GeometryVector/interface/jacobians.h"
 
 using namespace reco;
 
@@ -37,7 +34,6 @@ void VertexCompositePtrCandidate::setCovariance(const CovarianceMatrix & err) {
 void VertexCompositePtrCandidate::createTrack() const {
 
   int nTracks = 0;
-  const std::shared_ptr<MagneticField> field( new UniformMagneticField(3.8) );
 
   // total 6x6 Cartesian covariance matrix
   // defined as the sum of individual covariance matrices, i.e.
@@ -60,13 +56,7 @@ void VertexCompositePtrCandidate::createTrack() const {
         }
       }
 
-      GlobalPoint  vtx( track->vx(), track->vy(), track->vz() );
-      GlobalVector mom( track->px(), track->py(), track->pz() );
-      GlobalTrajectoryParameters gtp(vtx, mom, track->charge(), &*field);
-
-      // define Jacobian to tranform 5x5 curvilinear to 6x6 Cartesian covariance matrix
-      JacobianCurvilinearToCartesian curv2Cart(gtp);
-      const AlgebraicMatrix65& jac = curv2Cart.jacobian();
+     AlgebraicMatrix65 jac = jacobians::jacobianCurvilinearToCartesian(GlobalVector(track->px(),track->py(),track->pz()),track->charge());
       // tranform 5x5 curvilinear to 6x6 Cartesian covariance matrix and add it to the total covariance matrix
       totCartError += ROOT::Math::Similarity(jac, curvError);
     }
@@ -88,13 +78,7 @@ void VertexCompositePtrCandidate::createTrack() const {
       }
     }
 
-    GlobalPoint  vtx( vx(), vy(), vz() );
-    GlobalVector mom( px(), py(), pz() );
-    GlobalTrajectoryParameters gtp(vtx, mom, 0, &*field);
-
-    // define Jacobian to tranform 6x6 Cartesian to 5x5 curvilinear covariance matrix
-    JacobianCartesianToCurvilinear cart2Curv(gtp);
-    const AlgebraicMatrix56& jac = cart2Curv.jacobian();
+    AlgebraicMatrix56 jac = jacobians::jacobianCartesianToCurvilinear(GlobalVector(px(),py(),pz()),0);
     // tranform 6x6 Cartesian to 5x5 curvilinear covariance matrix and put it in the appropriate format for the track creation
     AlgebraicSymMatrix55 curvError = ROOT::Math::Similarity(jac, cartError);
     reco::TrackBase::CovarianceMatrix m;
