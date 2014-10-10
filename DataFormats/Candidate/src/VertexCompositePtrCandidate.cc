@@ -7,9 +7,18 @@ VertexCompositePtrCandidate::VertexCompositePtrCandidate(Charge q, const Lorentz
 						   const CovarianceMatrix & err, double chi2, double ndof,
 						   int pdgId, int status, bool integerCharge) :
   CompositePtrCandidate(q, p4, vtx, pdgId, status, integerCharge),
-  chi2_(chi2), ndof_(ndof), createdTrack_(false), hasTrack_(false) {
+  chi2_(chi2), ndof_(ndof), hasTrack_(false) {
   setCovariance(err);
 }
+
+VertexCompositePtrCandidate::VertexCompositePtrCandidate(Charge q, const LorentzVector & p4, const Point & vtx,
+                                                   const CovarianceMatrix & err, double chi2, double ndof, const reco::Track & t,
+                                                   int pdgId, int status, bool integerCharge) :
+  CompositePtrCandidate(q, p4, vtx, pdgId, status, integerCharge),
+  chi2_(chi2), ndof_(ndof),  track_(t), hasTrack_(true) {
+  setCovariance(err);
+}
+
 
 VertexCompositePtrCandidate::~VertexCompositePtrCandidate() { }
 
@@ -24,15 +33,19 @@ void VertexCompositePtrCandidate::fillVertexCovariance(CovarianceMatrix& err) co
       err(i, j) = covariance_[idx++];
 }
 
-void VertexCompositePtrCandidate::setCovariance(const CovarianceMatrix & err) {
+void VertexCompositePtrCandidate::setCovariance(const CovarianceMatrix & err, bool trackUpdate) {
   index idx = 0;
   for(index i = 0; i < dimension; ++i) 
     for(index j = 0; j <= i; ++j)
       covariance_[idx++] = err(i, j);
+  // if we set the covariance and the pseudo track wasn't yet available we can compute it
+  if(!hasTrack_ && trackUpdate) {
+	  track_=createTrack();	
+	  hasTrack_ = true; 
+	}
 }
 
-void VertexCompositePtrCandidate::createTrack() const {
-
+reco::Track VertexCompositePtrCandidate::createTrack() const {
   int nTracks = 0;
 
   // total 6x6 Cartesian covariance matrix
@@ -89,11 +102,10 @@ void VertexCompositePtrCandidate::createTrack() const {
     }
 
     // create track
-    track_ = reco::Track(vertexChi2(),vertexNdof(),math::XYZPoint(vx(),vy(),vz()),math::XYZVector(px(),py(),pz()),0,m,reco::TrackBase::undefAlgorithm,reco::TrackBase::loose);
+    return  reco::Track(vertexChi2(),vertexNdof(),math::XYZPoint(vx(),vy(),vz()),math::XYZVector(px(),py(),pz()),0,m,reco::TrackBase::undefAlgorithm,reco::TrackBase::loose);
 
-    hasTrack_ = true;
   }
   
-  createdTrack_ = true;
+  return reco::Track();
 }
 
