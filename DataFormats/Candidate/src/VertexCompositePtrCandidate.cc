@@ -1,5 +1,5 @@
 #include "DataFormats/Candidate/interface/VertexCompositePtrCandidate.h"
-#include "DataFormats/GeometryVector/interface/jacobians.h"
+#include "DataFormats/GeometryVector/interface/TrackingJacobians.h"
 
 using namespace reco;
 
