@@ -78,4 +78,5 @@ supportedBtagDiscr = {
   #, 'combinedSecondaryVertexSoftPFLeptonV1BJetTags'         : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   #, 'positiveCombinedSecondaryVertexSoftPFLeptonV1BJetTags' : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
   #, 'negativeCombinedSecondaryVertexSoftPFLeptonV1BJetTags' : ['impactParameterTagInfos', 'secondaryVertexTagInfos', 'softPFMuonsTagInfos', 'softPFElectronsTagInfos']
+  , 'combinedSecondaryVertexV2BJetTags'                     : ['impactParameterTagInfos', 'inclusiveSecondaryVertexFinderTagInfos']
   }

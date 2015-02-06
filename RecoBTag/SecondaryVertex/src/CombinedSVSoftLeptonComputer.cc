@@ -162,6 +162,8 @@ CombinedSVSoftLeptonComputer::operator () (const TrackIPTagInfo &ipInfo,
 
 	TaggingVariableList vars; 
 
+
+
 	vars.insert(btau::jetPt, jet->pt(), true);
 	vars.insert(btau::jetEta, jet->eta(), true);
 
@@ -378,41 +380,53 @@ CombinedSVSoftLeptonComputer::operator () (const TrackIPTagInfo &ipInfo,
  	reco::PFJet const * pfJet = dynamic_cast<reco::PFJet const *>( &* jet ) ;
 	pat::Jet const * patJet = dynamic_cast<pat::Jet const *>( &* jet ) ;
 	if ( pfJet != 0 ) {
-		vars.insert(btau::chargedHadronEnergyFraction,pfJet->chargedHadronEnergyFraction(), true);
-		vars.insert(btau::neutralHadronEnergyFraction,pfJet->neutralHadronEnergyFraction(), true);
-		vars.insert(btau::photonEnergyFraction,pfJet->photonEnergyFraction(), true);
-		vars.insert(btau::electronEnergyFraction,pfJet->electronEnergyFraction(), true);
-		vars.insert(btau::muonEnergyFraction,pfJet->muonEnergyFraction(), true);
-		vars.insert(btau::chargedHadronMultiplicity,pfJet->chargedHadronMultiplicity(), true);
-		vars.insert(btau::neutralHadronMultiplicity,pfJet->neutralHadronMultiplicity(), true);
-		vars.insert(btau::photonMultiplicity,pfJet->photonMultiplicity(), true);
-		vars.insert(btau::electronMultiplicity,pfJet->electronMultiplicity(), true);
-		vars.insert(btau::muonMultiplicity,pfJet->muonMultiplicity(), true);
-		vars.insert(btau::hadronMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity(), true);
-		vars.insert(btau::hadronPhotonMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity(), true);
-			vars.insert(btau::totalMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity()+pfJet->electronMultiplicity()+pfJet->muonMultiplicity(), true);
-
+	if( isUsed(btau::chargedHadronEnergyFraction) ) vars.insert(btau::chargedHadronEnergyFraction,pfJet->chargedHadronEnergyFraction(), true);
+		if( isUsed(btau::neutralHadronEnergyFraction) ) vars.insert(btau::neutralHadronEnergyFraction,pfJet->neutralHadronEnergyFraction(), true);
+		if( isUsed(btau::photonEnergyFraction) )        vars.insert(btau::photonEnergyFraction,pfJet->photonEnergyFraction(), true);
+		if( isUsed(btau::electronEnergyFraction) )      vars.insert(btau::electronEnergyFraction,pfJet->electronEnergyFraction(), true);
+		if( isUsed(btau::muonEnergyFraction) )          vars.insert(btau::muonEnergyFraction,pfJet->muonEnergyFraction(), true);
+		if( isUsed(btau::chargedHadronMultiplicity) )   vars.insert(btau::chargedHadronMultiplicity,pfJet->chargedHadronMultiplicity(), true);
+		if( isUsed(btau::neutralHadronMultiplicity) )   vars.insert(btau::neutralHadronMultiplicity,pfJet->neutralHadronMultiplicity(), true);
+		if( isUsed(btau::photonMultiplicity) )          vars.insert(btau::photonMultiplicity,pfJet->photonMultiplicity(), true);
+		if( isUsed(btau::electronMultiplicity) )        vars.insert(btau::electronMultiplicity,pfJet->electronMultiplicity(), true);
+		if( isUsed(btau::muonMultiplicity) )            vars.insert(btau::muonMultiplicity,pfJet->muonMultiplicity(), true);
+		if( isUsed(btau::hadronMultiplicity) )          vars.insert(btau::hadronMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity(), true);
+		if( isUsed(btau::hadronPhotonMultiplicity) )    vars.insert(btau::hadronPhotonMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity(), true);
+		if( isUsed(btau::totalMultiplicity) )           vars.insert(btau::totalMultiplicity,pfJet->chargedHadronMultiplicity()+pfJet->neutralHadronMultiplicity()+pfJet->photonMultiplicity()+pfJet->electronMultiplicity()+pfJet->muonMultiplicity(), true);
 	}
 	else if( patJet != 0)
 	{
-		vars.insert(btau::chargedHadronEnergyFraction,patJet->chargedHadronEnergyFraction(), true);
-		vars.insert(btau::neutralHadronEnergyFraction,patJet->neutralHadronEnergyFraction(), true);
-		vars.insert(btau::photonEnergyFraction,patJet->photonEnergyFraction(), true);
-		vars.insert(btau::electronEnergyFraction,patJet->electronEnergyFraction(), true);
-		vars.insert(btau::muonEnergyFraction,patJet->muonEnergyFraction(), true);
-		vars.insert(btau::chargedHadronMultiplicity,patJet->chargedHadronMultiplicity(), true);
-		vars.insert(btau::neutralHadronMultiplicity,patJet->neutralHadronMultiplicity(), true);
-		vars.insert(btau::photonMultiplicity,patJet->photonMultiplicity(), true);
-		vars.insert(btau::electronMultiplicity,patJet->electronMultiplicity(), true);
-		vars.insert(btau::muonMultiplicity,patJet->muonMultiplicity(), true);
-		vars.insert(btau::hadronMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity(), true);
-		vars.insert(btau::hadronPhotonMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity(), true);
-			vars.insert(btau::totalMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity()+patJet->electronMultiplicity()+patJet->muonMultiplicity(), true);
+		if( isUsed(btau::chargedHadronEnergyFraction) ) vars.insert(btau::chargedHadronEnergyFraction,patJet->chargedHadronEnergyFraction(), true);
+		if( isUsed(btau::neutralHadronEnergyFraction) ) vars.insert(btau::neutralHadronEnergyFraction,patJet->neutralHadronEnergyFraction(), true);
+		if( isUsed(btau::photonEnergyFraction) )        vars.insert(btau::photonEnergyFraction,patJet->photonEnergyFraction(), true);
+		if( isUsed(btau::electronEnergyFraction) )      vars.insert(btau::electronEnergyFraction,patJet->electronEnergyFraction(), true);
+		if( isUsed(btau::muonEnergyFraction) )          vars.insert(btau::muonEnergyFraction,patJet->muonEnergyFraction(), true);
+		if( isUsed(btau::chargedHadronMultiplicity) )   vars.insert(btau::chargedHadronMultiplicity,patJet->chargedHadronMultiplicity(), true);
+		if( isUsed(btau::neutralHadronMultiplicity) )   vars.insert(btau::neutralHadronMultiplicity,patJet->neutralHadronMultiplicity(), true);
+		if( isUsed(btau::photonMultiplicity) )          vars.insert(btau::photonMultiplicity,patJet->photonMultiplicity(), true);
+		if( isUsed(btau::electronMultiplicity) )        vars.insert(btau::electronMultiplicity,patJet->electronMultiplicity(), true);
+		if( isUsed(btau::muonMultiplicity) )            vars.insert(btau::muonMultiplicity,patJet->muonMultiplicity(), true);
+		if( isUsed(btau::hadronMultiplicity) )          vars.insert(btau::hadronMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity(), true);
+		if( isUsed(btau::hadronPhotonMultiplicity) )    vars.insert(btau::hadronPhotonMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity(), true);
+		if( isUsed(btau::totalMultiplicity) )           vars.insert(btau::totalMultiplicity,patJet->chargedHadronMultiplicity()+patJet->neutralHadronMultiplicity()+patJet->photonMultiplicity()+patJet->electronMultiplicity()+patJet->muonMultiplicity(), true);
 	
 	}
 	else
 	{
-		throw cms::Exception("InvalidConfiguration") << "From CombinedSVSoftLeptonComputer::operator: reco::PFJet OR pat::Jet are required by this module" << std::endl;	
+		if( isUsed(btau::chargedHadronEnergyFraction) ) vars.insert(btau::chargedHadronEnergyFraction,0., true);
+		if( isUsed(btau::neutralHadronEnergyFraction) ) vars.insert(btau::neutralHadronEnergyFraction,0., true);
+		if( isUsed(btau::photonEnergyFraction) )        vars.insert(btau::photonEnergyFraction,0., true);
+		if( isUsed(btau::electronEnergyFraction) )      vars.insert(btau::electronEnergyFraction,0., true);
+		if( isUsed(btau::muonEnergyFraction) )          vars.insert(btau::muonEnergyFraction,0., true);
+		if( isUsed(btau::chargedHadronMultiplicity) )   vars.insert(btau::chargedHadronMultiplicity,0, true);
+		if( isUsed(btau::neutralHadronMultiplicity) )   vars.insert(btau::neutralHadronMultiplicity,0, true);
+		if( isUsed(btau::photonMultiplicity) )          vars.insert(btau::photonMultiplicity,0, true);
+		if( isUsed(btau::electronMultiplicity) )        vars.insert(btau::electronMultiplicity,0, true);
+		if( isUsed(btau::muonMultiplicity) )            vars.insert(btau::muonMultiplicity,0, true);
+		if( isUsed(btau::hadronMultiplicity) )          vars.insert(btau::hadronMultiplicity,0, true);
+		if( isUsed(btau::hadronPhotonMultiplicity) )    vars.insert(btau::hadronPhotonMultiplicity,0, true);
+		if( isUsed(btau::totalMultiplicity) )           vars.insert(btau::totalMultiplicity,0, true);
+		//throw cms::Exception("InvalidConfiguration") << "From CombinedSVSoftLeptonComputer::operator: reco::PFJet OR pat::Jet are required by this module" << std::endl;	
 	}
 
 	int leptonCategory = 0; //0 = no lepton, 1 = muon, 2 = electron

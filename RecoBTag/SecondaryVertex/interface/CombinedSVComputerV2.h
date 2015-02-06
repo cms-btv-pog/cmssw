@@ -19,6 +19,8 @@ class CombinedSVComputerV2 {
 	operator () (const reco::TrackIPTagInfo &ipInfo,
 	             const reco::SecondaryVertexTagInfo &svInfo) const;
 
+	inline bool isUsed(reco::btau::TaggingVariableName var) const { return std::binary_search(taggingVariables.begin(), taggingVariables.end(), var); }
+
     private:
 	struct IterationRange;
 
@@ -45,6 +47,7 @@ class CombinedSVComputerV2 {
 	bool					vertexMassCorrection;
 	reco::V0Filter				pseudoVertexV0Filter;
 	reco::V0Filter				trackPairV0Filter;
+	std::vector<reco::btau::TaggingVariableName> taggingVariables;
 };
 
 #endif // RecoBTag_SecondaryVertex_CombinedSVComputerV2_h
