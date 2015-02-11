@@ -14,14 +14,15 @@
 
 class CombinedSVSoftLeptonComputer {
     public:
-	CombinedSVSoftLeptonComputer(const edm::ParameterSet &params);
+	  CombinedSVSoftLeptonComputer(const edm::ParameterSet &params);
 
-	reco::TaggingVariableList
+	 reco::TaggingVariableList
 	operator () (const reco::TrackIPTagInfo &ipInfo,
 	             const reco::SecondaryVertexTagInfo &svInfo,
 							 const reco::SoftLeptonTagInfo &muonInfo,
 							 const reco::SoftLeptonTagInfo &elecInfo ) const;
-
+	inline bool isUsed(reco::btau::TaggingVariableName var) const { return std::binary_search(taggingVariables.begin(), taggingVariables.end(), var); }
+  
     private:
 	struct IterationRange;
 
@@ -48,6 +49,8 @@ class CombinedSVSoftLeptonComputer {
 	bool					vertexMassCorrection;
 	reco::V0Filter				pseudoVertexV0Filter;
 	reco::V0Filter				trackPairV0Filter;
+	std::vector<reco::btau::TaggingVariableName> taggingVariables;
+      
 
 };
 
