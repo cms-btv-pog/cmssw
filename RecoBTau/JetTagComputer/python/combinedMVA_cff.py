@@ -14,3 +14,5 @@ from RecoBTau.JetTagComputer.candidateNegativeCombinedMVAComputer_cfi import *
 from RecoBTau.JetTagComputer.pfNegativeCombinedMVABJetTags_cfi import *
 from RecoBTau.JetTagComputer.candidatePositiveCombinedMVAComputer_cfi import *
 from RecoBTau.JetTagComputer.pfPositiveCombinedMVABJetTags_cfi import *
+from RecoBTau.JetTagComputer.candidateCombinedTMVAComputer_cfi import *
+from RecoBTau.JetTagComputer.pfCombinedTMVABJetTags_cfi import *
