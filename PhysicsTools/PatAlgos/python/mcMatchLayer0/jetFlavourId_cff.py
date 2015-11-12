@@ -31,7 +31,7 @@ patJetFlavourAssociation = cms.EDProducer("JetFlavourClustering",
     jetAlgorithm = cms.string("AntiKt"),
     rParam = cms.double(0.4),
     ghostRescaling = cms.double(1e-18),
-    hadronFlavourHasPriority = cms.bool(False)
+    hadronFlavourHasPriority = cms.bool(True)
 )
 
 # default PAT sequence for jet flavour identification
