@@ -31,6 +31,7 @@ SiPixelTrackResidualSource_Cosmics.saveFile = False
 from DQM.SiPixelMonitorTrack.SiPixelMonitorEfficiency_cfi import *
 SiPixelHitEfficiencySource.saveFile = False
 SiPixelHitEfficiencySource.trajectoryInput = cms.InputTag('generalTracks') 
+from DQM.TrackerMonitorTrack.SiPixelMonitorTrackResiduals_cfi import *
 
 ##online/offline
 #RawDataErrors
@@ -97,15 +98,18 @@ SiPixelHitEfficiencySource.diskOn = False
 SiPixelHitEfficiencySource.ringOn = False
 
 #HI track modules
-hiTracks = "hiGlobalPrimTracks"
+hiTracks = "hiGeneralTracks"
 
 SiPixelTrackResidualSource_HeavyIons = SiPixelTrackResidualSource.clone(
-    TrackCandidateProducer = 'hiPrimTrackCandidates',
-    trajectoryInput = hiTracks
+    TrackCandidateProducer = hiTracks,
+    trajectoryInput = hiTracks,
+    tracksrc=hiTracks,
+    vtxsrc='hiSelectedVertex'
     )
 
 SiPixelHitEfficiencySource_HeavyIons = SiPixelHitEfficiencySource.clone(
-    trajectoryInput = hiTracks
+    trajectoryInput = hiTracks,
+    vtxsrc='hiSelectedVertex'
     )
 
 
@@ -138,7 +142,7 @@ dqmInfo = cms.EDAnalyzer("DQMEventInfo",
 #FED integrity
 from DQM.SiPixelMonitorRawData.SiPixelMonitorHLT_cfi import *
 
-siPixelOfflineDQM_source = cms.Sequence(SiPixelHLTSource + SiPixelRawDataErrorSource + SiPixelDigiSource + SiPixelRecHitSource + SiPixelClusterSource + SiPixelTrackResidualSource + SiPixelHitEfficiencySource + dqmInfo)
+siPixelOfflineDQM_source = cms.Sequence(SiPixelHLTSource + SiPixelRawDataErrorSource + SiPixelDigiSource + SiPixelRecHitSource + SiPixelClusterSource + SiPixelTrackResidualSource + SiPixelHitEfficiencySource + SiPixelMonitorTrackResiduals + dqmInfo)
 
 siPixelOfflineDQM_cosmics_source = cms.Sequence(SiPixelHLTSource + SiPixelRawDataErrorSource + SiPixelDigiSource + SiPixelRecHitSource + SiPixelClusterSource + SiPixelTrackResidualSource_Cosmics + dqmInfo)
 

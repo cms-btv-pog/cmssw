@@ -3,15 +3,18 @@ import FWCore.ParameterSet.Config as cms
 MicroEventContent = cms.PSet(
     outputCommands = cms.untracked.vstring(
         'drop *',
-        'keep *_slimmedPhotons*_*_*',
+        'keep *_slimmedPhotons_*_*',
         'keep *_slimmedElectrons_*_*',
-        'keep *_slimmedMuons*_*_*',
-        'keep *_slimmedTaus*_*_*',
+        'keep *_slimmedMuons_*_*',
+        'keep *_slimmedTaus_*_*',
+        'keep *_slimmedTausBoosted_*_*',
         'keep *_slimmedJets_*_*',
         'keep *_slimmedJetsAK8_*_*',
         'keep *_slimmedJetsPuppi_*_*',
-        'keep *_slimmedMETs*_*_*',
-        'keep *_slimmedSecondaryVertices*_*_*',
+        'keep *_slimmedMETs_*_*',
+        'keep *_slimmedMETsNoHF_*_*',
+        'keep *_slimmedMETsPuppi_*_*',
+        'keep *_slimmedSecondaryVertices_*_*',
         'keep *_cmsTopTaggerMap_*_*',
         #'keep *_slimmedJetsAK8PFCHSSoftDropSubjets_*_*',
         #'keep *_slimmedJetsCMSTopTagCHSSubjets_*_*',
@@ -19,14 +22,13 @@ MicroEventContent = cms.PSet(
         'keep *_slimmedJetsCMSTopTagCHSPacked_SubJets_*',
         #'keep *_packedPatJetsAK8_*_*',
         ## add extra METs
-
+        
         'keep recoPhotonCores_reducedEgamma_*_*',
         'keep recoGsfElectronCores_reducedEgamma_*_*',
         'keep recoConversions_reducedEgamma_*_*',
         'keep recoSuperClusters_reducedEgamma_*_*',
         'keep recoCaloClusters_reducedEgamma_*_*',
         'keep EcalRecHitsSorted_reducedEgamma_*_*',
-
 
         'drop *_*_caloTowers_*',
         'drop *_*_pfCandidates_*',
@@ -36,16 +38,29 @@ MicroEventContent = cms.PSet(
         'keep *_offlineSlimmedPrimaryVertices_*_*',
         'keep patPackedCandidates_packedPFCandidates_*_*',
 
-        'keep double_fixedGridRho*__*',
+        'keep *_bunchSpacingProducer_*_*',
+
+        #'keep double_fixedGridRho*__*',
+        'keep double_fixedGridRhoAll__*',
+        'keep double_fixedGridRhoFastjetAll__*',
+        'keep double_fixedGridRhoFastjetAllCalo__*',
+        'keep double_fixedGridRhoFastjetCentral_*_*',
+        'keep double_fixedGridRhoFastjetCentralCalo__*',
+        'keep double_fixedGridRhoFastjetCentralChargedPileUp__*',
+        'keep double_fixedGridRhoFastjetCentralNeutral__*',
 
         'keep *_selectedPatTrigger_*_*',
         'keep patPackedTriggerPrescales_patTrigger__*',
+        'keep patPackedTriggerPrescales_patTrigger_l1max_*',
+        'keep patPackedTriggerPrescales_patTrigger_l1min_*',
         'keep *_l1extraParticles_*_*',
         'keep L1GlobalTriggerReadoutRecord_gtDigis_*_*',
         'keep *_TriggerResults_*_HLT',
         'keep *_TriggerResults_*_*', # for MET filters (a catch all for the moment, but ideally it should be only the current process)
         'keep patPackedCandidates_lostTracks_*_*',
         'keep HcalNoiseSummary_hcalnoise__*',
+        'keep recoCSCHaloData_CSCHaloData_*_*',
+        'keep recoBeamHaloSummary_BeamHaloSummary_*_*',
         'keep *_caTopTagInfosPAT_*_*'
     )
 )
@@ -57,8 +72,10 @@ MicroEventContentMC.outputCommands += [
         'keep patPackedGenParticles_packedGenParticles_*_*',
         'keep recoGenParticles_prunedGenParticles_*_*',
         'keep LHEEventProduct_*_*_*',
-        'keep PileupSummaryInfos_*_*_*',
+        'keep PileupSummaryInfos_slimmedAddPileupInfo_*_*',
         'keep GenFilterInfo_*_*_*',
+        'keep GenLumiInfoHeader_generator_*_*',
+        'keep GenLumiInfoProduct_*_*_*',
         'keep GenEventInfoProduct_generator_*_*',
         # RUN
         'keep LHERunInfoProduct_*_*_*',

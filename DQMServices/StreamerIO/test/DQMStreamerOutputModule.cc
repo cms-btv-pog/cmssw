@@ -27,19 +27,23 @@ class DQMStreamerOutputModule : public edm::StreamerOutputModuleBase {
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
  private:
-  virtual void start() const;
-  virtual void stop() const;
+  virtual void start() override;
+  virtual void stop() override;
 
   // no clue why the hell these are const in the parent class
   // so these can't be used - I will do some very bad mutable magic
-  virtual void doOutputHeader(InitMsgBuilder const& init_message) const;
-  virtual void doOutputEvent(EventMsgBuilder const& msg) const;
+  //
+  // NOTE: these are no longer const in the parent class, (or here).
+  // So perhaps they can be used now?
+  //
+  virtual void doOutputHeader(InitMsgBuilder const& init_message) override;
+  virtual void doOutputEvent(EventMsgBuilder const& msg) override;
 
   virtual void beginLuminosityBlock(edm::LuminosityBlockPrincipal const&,
-                                    edm::ModuleCallingContext const*);
+                                    edm::ModuleCallingContext const*) override;
 
   virtual void endLuminosityBlock(edm::LuminosityBlockPrincipal const&,
-                                  edm::ModuleCallingContext const*);
+                                  edm::ModuleCallingContext const*) override;
 
  private:
   std::string streamLabel_;
@@ -56,7 +60,8 @@ class DQMStreamerOutputModule : public edm::StreamerOutputModuleBase {
 };  //end-of-class-def
 
 DQMStreamerOutputModule::DQMStreamerOutputModule(edm::ParameterSet const& ps)
-    : edm::StreamerOutputModuleBase(ps),
+    : edm::one::OutputModuleBase::OutputModuleBase(ps),
+      edm::StreamerOutputModuleBase(ps),
       streamLabel_(ps.getUntrackedParameter<std::string>("streamLabel")),
       runInputDir_(ps.getUntrackedParameter<std::string>("runInputDir", "")),
       processed_(0),
@@ -75,12 +80,12 @@ DQMStreamerOutputModule::DQMStreamerOutputModule(edm::ParameterSet const& ps)
 
 DQMStreamerOutputModule::~DQMStreamerOutputModule() {}
 
-void DQMStreamerOutputModule::doOutputHeader(InitMsgBuilder const& i) const {
+void DQMStreamerOutputModule::doOutputHeader(InitMsgBuilder const& i) {
 
   init_message_cache_.reset(new InitMsgView(i.startAddress()));
 }
 
-void DQMStreamerOutputModule::doOutputEvent(EventMsgBuilder const& msg) const {
+void DQMStreamerOutputModule::doOutputEvent(EventMsgBuilder const& msg) {
 
   ++processed_;
 
@@ -159,9 +164,9 @@ void DQMStreamerOutputModule::endLuminosityBlock(
   file.close();
 }
 
-void DQMStreamerOutputModule::start() const {}
+void DQMStreamerOutputModule::start() {}
 
-void DQMStreamerOutputModule::stop() const {
+void DQMStreamerOutputModule::stop() {
   std::cout << "DQMStreamerOutputModule : end run" << std::endl;
   stream_writer_events_.reset();
 

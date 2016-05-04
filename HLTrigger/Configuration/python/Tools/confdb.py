@@ -55,7 +55,7 @@ class HLTProcess(object):
 
     # get the configuration from ConfdB
     from confdbOfflineConverter import OfflineConverter
-    self.converter = OfflineConverter(database = self.config.menu.db)
+    self.converter = OfflineConverter(version = self.config.menu.version, database = self.config.menu.database)
     self.buildPathList()
     self.buildOptions()
     self.getRawConfigurationFromDB()
@@ -74,10 +74,8 @@ class HLTProcess(object):
 
     data, err = self.converter.query( *args )
     if 'ERROR' in err or 'Exhausted Resultset' in err or 'CONFIG_NOT_FOUND' in err:
-        print "%s: error while retriving the HLT menu" % os.path.basename(sys.argv[0])
-        print
-        print err
-        print
+        sys.stderr.write("%s: error while retrieving the HLT menu\n\n" % os.path.basename(sys.argv[0]))
+        sys.stderr.write(err + "\n\n")
         sys.exit(1)
     self.data = data
 
@@ -98,10 +96,8 @@ class HLTProcess(object):
 
     data, err = self.converter.query( *args )
     if 'ERROR' in err or 'Exhausted Resultset' in err or 'CONFIG_NOT_FOUND' in err:
-        print "%s: error while retriving the list of paths from the HLT menu" % os.path.basename(sys.argv[0])
-        print
-        print err
-        print
+        sys.stderr.write("%s: error while retrieving the list of paths from the HLT menu\n\n" % os.path.basename(sys.argv[0]))
+        sys.stderr.write(err + "\n\n")
         sys.exit(1)
     filter = re.compile(r' *= *cms.(End)?Path.*')
     paths  = [ filter.sub('', line) for line in data.splitlines() if filter.search(line) ]
@@ -165,8 +161,8 @@ class HLTProcess(object):
       self.data += """
 # add specific customizations
 from HLTrigger.Configuration.customizeHLTforALL import customizeHLTforAll
-fragment = customizeHLTforAll(fragment)
-"""
+fragment = customizeHLTforAll(fragment,"%s")
+""" % (self.config.type)
     else:
       if self.config.type=="Fake":
         prefix = "run1"
@@ -189,9 +185,13 @@ _customInfo['globalTag' ]= "%s"
 _customInfo['inputFile' ]=  %s
 _customInfo['realData'  ]=  %s
 from HLTrigger.Configuration.customizeHLTforALL import customizeHLTforAll
-process = customizeHLTforAll(process,_customInfo)
-""" % (self.config.type,_gtData,_gtMc,self.config.type,self.config.type,self.config.events,self.config.globaltag,self.source,self.config.data)
+process = customizeHLTforAll(process,"%s",_customInfo)
+""" % (self.config.type,_gtData,_gtMc,self.config.type,self.config.type,self.config.events,self.config.globaltag,self.source,self.config.data,self.config.type)
 
+    self.data += """
+from HLTrigger.Configuration.customizeHLTforCMSSW import customizeHLTforCMSSW
+process = customizeHLTforCMSSW(process,"%s")
+""" % (self.config.type)
 
   # customize the configuration according to the options
   def customize(self):
@@ -239,6 +239,45 @@ process = customizeHLTforAll(process,_customInfo)
     # if requested, instrument the self with the modules and EndPath needed for timing studies
     self.instrumentTiming()
 
+#    if self.config.type not in ('Fake','FULL') :
+#      procfrag = self.labels['process'].split('.')[0]
+#      if '50ns_5e33_v1' in self.config.type :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for 50ns
+#from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_50ns_v1 as loadL1Menu
+#%s = loadL1Menu(%s)
+#""" %(procfrag,procfrag)
+#      elif '25ns14e33_v1' in self.config.type :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for 25ns
+#from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_25ns_v2 as loadL1menu
+#%s = loadL1menu(%s)
+#""" %(procfrag,procfrag)
+#      elif '50ns' in self.config.type :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for 50ns
+#from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_50ns_v4 as loadL1Menu
+#%s = loadL1Menu(%s)
+#""" %(procfrag,procfrag)
+#      elif 'HIon' in self.config.type :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for HIon
+#from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_CollisionsHeavyIons2015_v0 as loadL1Menu
+#%s = loadL1Menu(%s)
+#""" %(procfrag,procfrag)
+#      elif 'LowPU' in self.config.type :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for LowPU
+#from L1Trigger.Configuration.customise_overwriteL1Menu import  L1Menu_Collisions2015_lowPU_v4 as loadL1Menu
+#%s = loadL1Menu(%s)
+#""" %(procfrag,procfrag)
+#      else :
+#        self.data += """
+## load 2015 Run-2 L1 Menu for 25ns (default for GRun, PIon)
+#from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_25ns_v2 as loadL1menu
+#%s = loadL1menu(%s)
+#""" %(procfrag,procfrag)
+
     if self.config.fragment:
       self.data += """
 # dummyfy hltGetConditions in cff's
@@ -250,32 +289,6 @@ if 'hltGetConditions' in %(dict)s and 'HLTriggerFirstPath' in %(dict)s :
 """
 
     else:
-
-      if self.config.type not in ('Fake',) :
-        if '50ns' in self.config.type :
-          self.data += """
-# load 2015 Run-2 L1 Menu for 50ns
-from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_50ns_v3 as loadL1Menu
-process = loadL1Menu(process)
-"""
-        elif 'HIon' in self.config.type :
-          self.data += """
-# load 2015 Run-2 L1 Menu for HIon
-from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_CollisionsHeavyIons2015_v0 as loadL1Menu
-process = loadL1Menu(process)
-"""
-        elif 'LowPU' in self.config.type :
-          self.data += """
-# load 2015 Run-2 L1 Menu for LowPU
-from L1Trigger.Configuration.customise_overwriteL1Menu import  L1Menu_Collisions2015_lowPU_v3 as loadL1Menu
-process = loadL1Menu(process)
-"""
-        else :
-          self.data += """
-# load 2015 Run-2 L1 Menu for 25ns (default for GRun, PIon)
-from L1Trigger.Configuration.customise_overwriteL1Menu import L1Menu_Collisions2015_25ns_v2 as loadL1menu
-process = loadL1menu(process)
-"""
 
       # override the process name and adapt the relevant filters
       self.overrideProcessName()

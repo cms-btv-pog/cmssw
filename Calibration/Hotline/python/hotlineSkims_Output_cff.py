@@ -1,9 +1,9 @@
 import FWCore.ParameterSet.Config as cms
 import copy
 
-from Configuration.EventContent.EventContent_cff import FEVTEventContent
+from Configuration.EventContent.EventContent_cff import FEVTEventContent as _FEVTEventContent
 
-OutALCARECOHotline = cms.PSet(
+OutALCARECOHotline_noDrop = cms.PSet(
     SelectEvents = cms.untracked.PSet(
         SelectEvents = cms.vstring(
             "pathHotlineSkimSingleMuon",
@@ -27,7 +27,11 @@ OutALCARECOHotline = cms.PSet(
             "pathHotlineSkimCondMET",
         ),
     ),
-    outputCommands = copy.deepcopy(FEVTEventContent.outputCommands)
+    outputCommands = copy.deepcopy(_FEVTEventContent.outputCommands)
 )
 
-while 'drop *' in OutALCARECOHotline.outputCommands: OutALCARECOHotline.outputCommands.remove('drop *')
+while 'drop *' in OutALCARECOHotline_noDrop.outputCommands: OutALCARECOHotline_noDrop.outputCommands.remove('drop *')
+
+import copy
+OutALCARECOHotline = copy.deepcopy(OutALCARECOHotline_noDrop)
+OutALCARECOHotline.outputCommands.insert(0, "drop *")

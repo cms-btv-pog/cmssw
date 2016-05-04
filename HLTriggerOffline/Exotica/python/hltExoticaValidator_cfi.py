@@ -23,7 +23,8 @@ from HLTriggerOffline.Exotica.analyses.hltExoticaHighPtElectron_cff    import Hi
 #from HLTriggerOffline.Exotica.analyses.hltExoticaLowPtElectron_cff     import LowPtElectronPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaHighPtPhoton_cff      import HighPtPhotonPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaDiPhoton_cff          import DiPhotonPSet
-from HLTriggerOffline.Exotica.analyses.hltExoticaHT_cff                import HTPSet
+from HLTriggerOffline.Exotica.analyses.hltExoticaPFHT_cff              import PFHTPSet
+from HLTriggerOffline.Exotica.analyses.hltExoticaCaloHT_cff            import CaloHTPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaJetNoBptx_cff         import JetNoBptxPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaMuonNoBptx_cff        import MuonNoBptxPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaDisplacedMuEG_cff     import DisplacedMuEGPSet
@@ -39,6 +40,8 @@ from HLTriggerOffline.Exotica.analyses.hltExoticaEleMu_cff             import El
 from HLTriggerOffline.Exotica.analyses.hltExoticaHTDisplacedJets_cff   import HTDisplacedJetsPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaPhotonMET_cff         import PhotonMETPSet
 from HLTriggerOffline.Exotica.analyses.hltExoticaSingleMuon_cff        import SingleMuonPSet
+from HLTriggerOffline.Exotica.analyses.hltExoticaDSTJets_cff           import DSTJetsPSet
+from HLTriggerOffline.Exotica.analyses.hltExoticaDSTMuons_cff          import DSTMuonsPSet
 
 hltExoticaValidator = cms.EDAnalyzer(
 
@@ -62,7 +65,8 @@ hltExoticaValidator = cms.EDAnalyzer(
         "SingleMuon",
         "JetNoBptx",
         "MuonNoBptx",
-        "HT",
+        "PFHT",
+        "CaloHT",
         "DisplacedMuEG",
         "DisplacedMuJet",
         "DisplacedDimuon",
@@ -74,7 +78,9 @@ hltExoticaValidator = cms.EDAnalyzer(
         #"DisplacedDimuonDijet",
         "EleMu",
         "PhotonMET",
-        "HTDisplacedJets"
+        "HTDisplacedJets",
+        "DSTJets",
+        "DSTMuons"
         ),
     
     # -- The instance name of the reco::GenParticles collection
@@ -115,7 +121,7 @@ hltExoticaValidator = cms.EDAnalyzer(
     # Syntax in the strings: valid syntax of the StringCutObjectSelector class
 
     # --- Muons
-    Mu_genCut     = cms.string("pt > 10 && abs(eta) < 2.4 && abs(pdgId) == 13 && isPromptFinalState"),
+    Mu_genCut     = cms.string("pt > 10 && abs(eta) < 2.4 && abs(pdgId) == 13 && (isPromptFinalState || isDirectPromptTauDecayProductFinalState)"),
     Mu_recCut     = cms.string("pt > 10 && abs(eta) < 2.4 && isPFMuon && (isTrackerMuon || isGlobalMuon)"), # Loose Muon
     
     # --- MuonTracks
@@ -125,7 +131,7 @@ hltExoticaValidator = cms.EDAnalyzer(
     refittedStandAloneMuons_recCut  = cms.string("pt > 10 && abs(eta) < 2.4"), 
 
     # --- Electrons
-    Ele_genCut      = cms.string("pt > 10 && (abs(eta)<1.444 || abs(eta)>1.566) && abs(eta)<2.5 && abs(pdgId) == 11 && isPromptFinalState"),
+    Ele_genCut      = cms.string("pt > 10 && (abs(eta)<1.444 || abs(eta)>1.566) && abs(eta)<2.5 && abs(pdgId) == 11 && (isPromptFinalState||isDirectPromptTauDecayProductFinalState)"),
     Ele_recCut      = cms.string(
         "pt > 10 && (abs(eta)<1.444 || abs(eta)>1.566) && abs(eta)< 2.5 "+
         " && hadronicOverEm < 0.05 "+ #&& eSuperClusterOverP > 0.5 && eSuperClusterOverP < 1.5 "+
@@ -178,6 +184,9 @@ hltExoticaValidator = cms.EDAnalyzer(
     CaloMET_genCut  = cms.string("pt > 75"),
     CaloMET_recCut  = cms.string("pt > 75"),
 
+    CaloMHT_genCut  = cms.string("pt > 75"),
+    CaloMHT_recCut  = cms.string("pt > 75"),  
+   
     hltMET_genCut   = cms.string("pt > 75"),
     hltMET_recCut   = cms.string("pt > 75"),  
    
@@ -219,9 +228,12 @@ hltExoticaValidator = cms.EDAnalyzer(
     METplusTrack     = METplusTrackPSet,                                 
     Monojet          = MonojetPSet,
     MonojetBackup    = MonojetBackupPSet,
-    HT               = HTPSet,
+    PFHT             = PFHTPSet,
+    CaloHT           = CaloHTPSet,
     #DisplacedDimuonDijet = DisplacedDimuonDijetPSet,
     EleMu            = EleMuPSet,
     PhotonMET        = PhotonMETPSet,
-    HTDisplacedJets  = HTDisplacedJetsPSet 
+    HTDisplacedJets  = HTDisplacedJetsPSet, 
+    DSTJets          = DSTJetsPSet, 
+    DSTMuons         = DSTMuonsPSet
 )

@@ -97,7 +97,8 @@ public:
 
     /// track algorithm
     enum TrackAlgorithm {
-        undefAlgorithm = 0, ctf = 1, rs = 2, cosmics = 3,
+        undefAlgorithm = 0, ctf = 1, 
+        duplicateMerge = 2, cosmics = 3,
         initialStep = 4,
         lowPtTripletStep = 5,
         pixelPairStep = 6,
@@ -112,7 +113,9 @@ public:
         outInEcalSeededConv = 15, inOutEcalSeededConv = 16,
         nuclInter = 17,
         standAloneMuon = 18, globalMuon = 19, cosmicStandAloneMuon = 20, cosmicGlobalMuon = 21,
-        iter1LargeD0 = 22, iter2LargeD0 = 23, iter3LargeD0 = 24, iter4LargeD0 = 25, iter5LargeD0 = 26,
+        // Phase1
+        highPtTripletStep = 22, lowPtQuadStep = 23, detachedQuadStep = 24,
+        reservedForUpgrades1 = 25, reservedForUpgrades2 = 26,
         bTagGhostTracks = 27,
         beamhalo = 28,
         gsf = 29,
@@ -126,12 +129,21 @@ public:
 	hltIter4 = 35,
 	// steps used by all other objects @HLT
 	hltIterX = 36,
-        algoSize = 37
+   // steps used by HI muon regional iterative tracking
+   hiRegitMuInitialStep = 37,
+   hiRegitMuLowPtTripletStep = 38,
+   hiRegitMuPixelPairStep = 39,
+   hiRegitMuDetachedTripletStep = 40,
+   hiRegitMuMixedTripletStep = 41,
+   hiRegitMuPixelLessStep = 42,
+   hiRegitMuTobTecStep = 43,
+   hiRegitMuMuonSeededStepInOut = 44,
+   hiRegitMuMuonSeededStepOutIn = 45,
+   algoSize = 46
     };
 
     /// algo mask
     typedef std::bitset<algoSize> AlgoMask;
- 
 
     static const std::string algoNames[];
 
@@ -158,7 +170,7 @@ public:
     TrackBase(double chi2, double ndof, const Point &vertex,
               const Vector &momentum, int charge, const CovarianceMatrix &cov,
               TrackAlgorithm = undefAlgorithm, TrackQuality quality = undefQuality,
-              signed char nloops = 0);
+              signed char nloops = 0, uint8_t stopReason = 0);
 
     /// virtual destructor
     virtual ~TrackBase();
@@ -349,9 +361,7 @@ public:
     void setAlgoMask(AlgoMask a) { algoMask_ = a;}
 
     AlgoMask algoMask() const { return algoMask_;}
-#if ( !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__REFLEX__) ) || defined(__ROOTCLING__)
     unsigned long long algoMaskUL() const { return algoMask().to_ullong();}
-#endif
     bool isAlgoInMask(TrackAlgorithm a) const {return algoMask()[a];}
 
 
@@ -383,6 +393,11 @@ public:
     bool isLooper() const;
 
     signed char nLoops() const;
+
+    void setStopReason(uint8_t value) { stopReason_ = value; }
+
+    uint8_t stopReason() const { return stopReason_; }
+
 
 private:
     /// hit pattern
@@ -421,6 +436,9 @@ private:
 
     /// number of loops made during the building of the trajectory of a looper particle
     signed char nLoops_; // I use signed char because I don't expect more than 128 loops and I could use a negative value for a special purpose.
+
+    /// Stop Reason
+    uint8_t stopReason_;
 };
 
 //  Access the hit pattern, indicating in which Tracker layers the track has hits.
@@ -477,7 +495,7 @@ inline TrackBase::TrackAlgorithm TrackBase::algo() const
 }
 inline TrackBase::TrackAlgorithm TrackBase::originalAlgo() const
 {
-    return (TrackAlgorithm) (originalAlgorithm_);
+  return (TrackAlgorithm) (originalAlgorithm_);
 }
 
 

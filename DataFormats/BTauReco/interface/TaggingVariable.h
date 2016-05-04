@@ -42,6 +42,8 @@ namespace reco {
       trackEta,                                 // track pseudorapidity
       trackPhi,                                 // track polar angle
 
+      trackCharge,                              // track charge
+
       trackPtRel,                               // track transverse momentum, relative to the jet axis
       trackPPar,                                // track parallel momentum, along the jet axis
       trackEtaRel,                              // track pseudorapidity, relative to the jet axis
@@ -49,7 +51,6 @@ namespace reco {
       trackPtRatio,                             // track transverse momentum, relative to the jet axis, normalized to its energy
       trackPParRatio,                           // track parallel momentum, along the jet axis, normalized to its energy
 
-      trackIp2dSig,                             // track 2D impact parameter signifncance
       trackSip2dVal,                            // track 2D signed impact parameter
       trackSip2dSig,                            // track 2D signed impact parameter significance
       trackSip3dVal,                            // track 3D signed impact parameter

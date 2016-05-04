@@ -92,6 +92,17 @@ from HLTrigger.Configuration.HLTrigger_EventContent_cff import *
 from DQMOffline.Configuration.DQMOffline_EventContent_cff import *
 #
 #
+# FastSim
+#
+#
+from FastSimulation.Configuration.EventContent_cff import FASTPUEventContent
+import FastSimulation.Configuration.EventContent_cff as fastSimEC
+from Configuration.StandardSequences.Eras import eras
+if eras.fastSim.isChosen():
+    RecoLocalTrackerRECO.outputCommands = fastSimEC.RecoLocalTracker.outputCommands
+    RecoLocalTrackerFEVT.outputCommands = fastSimEC.RecoLocalTracker.outputCommands
+    SimG4CoreRAW = fastSimEC.SimRAW
+    SimG4CoreRECO = fastSimEC.SimRECO
 
 #
 #
@@ -292,7 +303,7 @@ FEVTDEBUGEventContent = cms.PSet(
 FEVTDEBUGHLTEventContent = cms.PSet(
     outputCommands = cms.untracked.vstring('drop *'),
     splitLevel = cms.untracked.int32(0),
-    eventAutoFlushCompressedSize=cms.untracked.int32(1*1024*1024)
+    eventAutoFlushCompressedSize=cms.untracked.int32(10*1024*1024)
 )
 
 #
@@ -348,6 +359,7 @@ DATAMIXEREventContent = cms.PSet(
                                                'keep HBHEDataFramesSorted_hcalDigis_*_*',
                                                'keep HFDataFramesSorted_hcalDigis_*_*',
                                                'keep HODataFramesSorted_hcalDigis_*_*',
+                                               'keep QIE10DataFrameHcalDataFrameContainer_hcalDigis_*_*',
                                                'keep ZDCDataFramesSorted_hcalDigis_*_*',
                                                'keep CastorDataFramesSorted_castorDigis_*_*',
                                                'keep EBDigiCollection_ecalDigis_*_*',
@@ -463,7 +475,6 @@ AODEventContent.outputCommands.extend(MEtoEDMConverterAOD.outputCommands)
 AODEventContent.outputCommands.extend(EvtScalersAOD.outputCommands)
 AODEventContent.outputCommands.extend(TcdsEventContent.outputCommands)
 AODEventContent.outputCommands.extend(CommonEventContent.outputCommands)
-AODEventContent.outputCommands.extend(SimGeneralAOD.outputCommands)
 AODEventContent.outputCommands.extend(EITopPAGEventContent.outputCommands)
 
 RAWSIMEventContent.outputCommands.extend(RAWEventContent.outputCommands)
@@ -510,12 +521,26 @@ PREMIXEventContent.outputCommands.extend(DigiToRawFEVT.outputCommands)
 PREMIXEventContent.outputCommands.extend(CommonEventContent.outputCommands)
 PREMIXEventContent.outputCommands.append('keep RPCDetIdRPCDigiMuonDigiCollection_simMuonRPCDigis_*_*')
 PREMIXEventContent.outputCommands.append('keep *_mix_MergedTrackTruth_*')
+PREMIXEventContent.outputCommands.append('keep StripDigiSimLinkedmDetSetVector_simSiStripDigis_*_*')
+PREMIXEventContent.outputCommands.append('keep PixelDigiSimLinkedmDetSetVector_simSiPixelDigis_*_*')
+PREMIXEventContent.outputCommands.append('keep StripDigiSimLinkedmDetSetVector_simMuonCSCDigis_*_*')
+PREMIXEventContent.outputCommands.append('keep RPCDigiSimLinkedmDetSetVector_*_*_*')
+PREMIXEventContent.outputCommands.append('keep DTLayerIdDTDigiSimLinkMuonDigiCollection_*_*_*')
+if eras.fastSim.isChosen():
+    PREMIXEventContent.outputCommands.extend(fastSimEC.extraPremixContent)
 
 PREMIXRAWEventContent.outputCommands.extend(RAWSIMEventContent.outputCommands)
 PREMIXRAWEventContent.outputCommands.append('keep CrossingFramePlaybackInfoNew_*_*_*')
 PREMIXRAWEventContent.outputCommands.append('drop CrossingFramePlaybackInfoNew_mix_*_*')
 PREMIXRAWEventContent.outputCommands.append('keep *_*_MergedTrackTruth_*')
-
+PREMIXRAWEventContent.outputCommands.append('keep *_*_StripDigiSimLink_*')
+PREMIXRAWEventContent.outputCommands.append('keep *_*_PixelDigiSimLink_*')
+PREMIXRAWEventContent.outputCommands.append('keep *_*_MuonCSCStripDigiSimLinks_*')
+PREMIXRAWEventContent.outputCommands.append('keep *_*_MuonCSCWireDigiSimLinks_*')
+PREMIXRAWEventContent.outputCommands.append('keep *_*_RPCDigiSimLink_*')
+PREMIXRAWEventContent.outputCommands.append('keep DTLayerIdDTDigiSimLinkMuonDigiCollection_*_*_*')
+if eras.fastSim.isChosen():
+    PREMIXEventContent.outputCommands.extend(fastSimEC.extraPremixContent)
 
 REPACKRAWSIMEventContent.outputCommands.extend(REPACKRAWEventContent.outputCommands)
 REPACKRAWSIMEventContent.outputCommands.extend(SimG4CoreRAW.outputCommands)
@@ -658,6 +683,13 @@ FEVTDEBUGEventContent.outputCommands.extend(SimMuonFEVTDEBUG.outputCommands)
 FEVTDEBUGEventContent.outputCommands.extend(SimCalorimetryFEVTDEBUG.outputCommands)
 FEVTDEBUGHLTEventContent.outputCommands.extend(FEVTDEBUGEventContent.outputCommands)
 FEVTDEBUGHLTEventContent.outputCommands.extend(HLTDebugFEVT.outputCommands)
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_MergedTrackTruth_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_StripDigiSimLink_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_PixelDigiSimLink_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_MuonCSCStripDigiSimLinks_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_MuonCSCWireDigiSimLinks_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep *_*_RPCDigiSimLink_*')
+FEVTDEBUGHLTEventContent.outputCommands.append('keep DTLayerIdDTDigiSimLinkMuonDigiCollection_*_*_*')
 RECODEBUGEventContent.outputCommands.extend(RECOSIMEventContent.outputCommands)
 RECODEBUGEventContent.outputCommands.extend(SimGeneralFEVTDEBUG.outputCommands)
 RECODEBUGEventContent.outputCommands.extend(SimTrackerDEBUG.outputCommands)
@@ -736,3 +768,10 @@ from PhysicsTools.PatAlgos.slimming.slimming_cff import MicroEventContent,MicroE
 
 MINIAODEventContent.outputCommands.extend(MicroEventContent.outputCommands)
 MINIAODSIMEventContent.outputCommands.extend(MicroEventContentMC.outputCommands)
+
+# in fastsim, normal digis are edaliases of simdigis
+# drop the simdigis to avoid complaints from the outputmodule related to duplicated branches
+if eras.fastSim.isChosen():
+    for _entry in [FEVTDEBUGHLTEventContent,FEVTDEBUGEventContent,RECOSIMEventContent,AODSIMEventContent]:
+        fastSimEC.dropSimDigis(_entry.outputCommands)
+    

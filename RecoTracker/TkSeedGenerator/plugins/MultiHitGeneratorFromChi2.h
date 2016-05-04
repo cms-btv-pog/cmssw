@@ -43,10 +43,6 @@ public:
 private:
   using HitOwnPtr = mayown_ptr<BaseTrackerRecHit>;
 
-  bool checkPhiInRange(float phi, float phi1, float phi2) const;
-  std::pair<float,float> mergePhiRanges(
-      const std::pair<float,float> &r1, const std::pair<float,float> &r2) const;
-
   void refit2Hits(HitOwnPtr & hit0,
 		  HitOwnPtr & hit1,
 		  TrajectoryStateOnSurface& tsos0,
@@ -81,7 +77,6 @@ private:
   std::vector<double> pt_interv;
   std::vector<double> chi2_cuts;
   bool refitHits;
-  bool debug;
   std::string filterName_;
   std::string builderName_;
 

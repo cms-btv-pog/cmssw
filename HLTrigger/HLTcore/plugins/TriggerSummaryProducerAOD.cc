@@ -30,6 +30,8 @@
 #include "DataFormats/METReco/interface/METFwd.h"
 #include "DataFormats/METReco/interface/CaloMET.h"
 #include "DataFormats/METReco/interface/CaloMETFwd.h"
+#include "DataFormats/METReco/interface/PFMET.h"
+#include "DataFormats/METReco/interface/PFMETFwd.h"
 #include "DataFormats/HcalIsolatedTrack/interface/IsolatedPixelTrackCandidate.h"
 
 #include "DataFormats/L1Trigger/interface/L1HFRings.h"
@@ -37,6 +39,12 @@
 #include "DataFormats/L1Trigger/interface/L1JetParticle.h"
 #include "DataFormats/L1Trigger/interface/L1MuonParticle.h"
 #include "DataFormats/L1Trigger/interface/L1EtMissParticle.h"
+
+#include "DataFormats/L1Trigger/interface/Muon.h"
+#include "DataFormats/L1Trigger/interface/EGamma.h"
+#include "DataFormats/L1Trigger/interface/Jet.h"
+#include "DataFormats/L1Trigger/interface/Tau.h"
+#include "DataFormats/L1Trigger/interface/EtSum.h"
 
 #include "DataFormats/JetReco/interface/PFJet.h"
 #include "DataFormats/TauReco/interface/PFTau.h"
@@ -95,8 +103,14 @@ TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps
   getL1JetParticleCollection_ = edm::GetterOfProducts<l1extra::L1JetParticleCollection>(edm::ProcessMatch(pn_), this);
   getL1EtMissParticleCollection_ = edm::GetterOfProducts<l1extra::L1EtMissParticleCollection>(edm::ProcessMatch(pn_), this);
   getL1HFRingsCollection_ = edm::GetterOfProducts<l1extra::L1HFRingsCollection>(edm::ProcessMatch(pn_), this);
+  getL1TMuonParticleCollection_ = edm::GetterOfProducts<l1t::MuonBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TEGammaParticleCollection_ = edm::GetterOfProducts<l1t::EGammaBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TJetParticleCollection_ = edm::GetterOfProducts<l1t::JetBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TTauParticleCollection_ = edm::GetterOfProducts<l1t::TauBxCollection>(edm::ProcessMatch(pn_), this);
+  getL1TEtSumParticleCollection_ = edm::GetterOfProducts<l1t::EtSumBxCollection>(edm::ProcessMatch(pn_), this);
   getPFJetCollection_ = edm::GetterOfProducts<reco::PFJetCollection>(edm::ProcessMatch(pn_), this);
   getPFTauCollection_ = edm::GetterOfProducts<reco::PFTauCollection>(edm::ProcessMatch(pn_), this);
+  getPFMETCollection_ = edm::GetterOfProducts<reco::PFMETCollection>(edm::ProcessMatch(pn_), this);
 
   callWhenNewProductsRegistered([this](edm::BranchDescription const& bd){
     getTriggerFilterObjectWithRefs_(bd);
@@ -113,8 +127,14 @@ TriggerSummaryProducerAOD::TriggerSummaryProducerAOD(const edm::ParameterSet& ps
     getL1JetParticleCollection_(bd);
     getL1EtMissParticleCollection_(bd);
     getL1HFRingsCollection_(bd);
+    getL1TMuonParticleCollection_(bd);
+    getL1TEGammaParticleCollection_(bd);
+    getL1TJetParticleCollection_(bd);
+    getL1TTauParticleCollection_(bd);
+    getL1TEtSumParticleCollection_(bd);
     getPFJetCollection_(bd);
     getPFTauCollection_(bd);
+    getPFMETCollection_(bd);
   });
 }
 
@@ -169,6 +189,7 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
    using namespace reco;
    using namespace l1extra;
    using namespace trigger;
+   using namespace l1t;
 
    std::vector<edm::Handle<trigger::TriggerFilterObjectWithRefs> > fobs;
    getTriggerFilterObjectWithRefs_.fillHandles(iEvent, fobs);
@@ -261,9 +282,15 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
    fillTriggerObjectCollections<              L1JetParticleCollection>(iEvent, getL1JetParticleCollection_);
    fillTriggerObjectCollections<           L1EtMissParticleCollection>(iEvent, getL1EtMissParticleCollection_);
    fillTriggerObjectCollections<                  L1HFRingsCollection>(iEvent, getL1HFRingsCollection_);
+   fillTriggerObjectCollections<                     MuonBxCollection>(iEvent, getL1TMuonParticleCollection_);
+   fillTriggerObjectCollections<                   EGammaBxCollection>(iEvent, getL1TEGammaParticleCollection_);
+   fillTriggerObjectCollections<                      JetBxCollection>(iEvent, getL1TJetParticleCollection_);
+   fillTriggerObjectCollections<                      TauBxCollection>(iEvent, getL1TTauParticleCollection_);
+   fillTriggerObjectCollections<                    EtSumBxCollection>(iEvent, getL1TEtSumParticleCollection_);
    ///
    fillTriggerObjectCollections<                      PFJetCollection>(iEvent, getPFJetCollection_);
    fillTriggerObjectCollections<                      PFTauCollection>(iEvent, getPFTauCollection_);
+   fillTriggerObjectCollections<                      PFMETCollection>(iEvent, getPFMETCollection_);
    ///
    const unsigned int nk(tags_.size());
    LogDebug("TriggerSummaryProducerAOD") << "Number of collections found: " << nk;
@@ -300,8 +327,14 @@ TriggerSummaryProducerAOD::produce(edm::Event& iEvent, const edm::EventSetup& iS
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1jetIds()    ,fobs[ifob]->l1jetRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1etmissIds() ,fobs[ifob]->l1etmissRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1hfringsIds(),fobs[ifob]->l1hfringsRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tmuonIds()  ,fobs[ifob]->l1tmuonRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tegammaIds(),fobs[ifob]->l1tegammaRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tjetIds()   ,fobs[ifob]->l1tjetRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1ttauIds()   ,fobs[ifob]->l1ttauRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->l1tetsumIds() ,fobs[ifob]->l1tetsumRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pfjetIds()    ,fobs[ifob]->pfjetRefs());
        fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pftauIds()    ,fobs[ifob]->pftauRefs());
+       fillFilterObjectMembers(iEvent,filterTag,fobs[ifob]->pfmetIds()    ,fobs[ifob]->pfmetRefs());
        product->addFilter(filterTag,ids_,keys_);
      }
    }
@@ -324,6 +357,7 @@ void TriggerSummaryProducerAOD::fillTriggerObjectCollections(const edm::Event& i
   using namespace reco;
   using namespace l1extra;
   using namespace trigger;
+  using namespace l1t;
 
   vector<Handle<C> > collections;
   getter.fillHandles(iEvent, collections);
@@ -394,6 +428,19 @@ void TriggerSummaryProducerAOD::fillTriggerObject(const l1extra::L1EtMissParticl
   } else {
     toc_.push_back(TriggerObject(0,           object.etTotal(),0.0,0.0,0.0));
   }
+
+  return;
+}
+
+void TriggerSummaryProducerAOD::fillTriggerObject(const reco::PFMET& object) {
+
+  using namespace reco;
+  using namespace trigger;
+
+  toc_.push_back( TriggerObject(object) );
+  toc_.push_back(TriggerObject(TriggerTET    ,object.sumEt()         ,0.0,0.0,0.0));
+  toc_.push_back(TriggerObject(TriggerMETSig ,object.mEtSig()        ,0.0,0.0,0.0));
+  toc_.push_back(TriggerObject(TriggerELongit,object.e_longitudinal(),0.0,0.0,0.0));
 
   return;
 }
@@ -505,6 +552,24 @@ void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const 
     keys_.push_back(offset+2*ref.key()+1);
   } else {
     keys_.push_back(offset+2*ref.key()+0);
+  }
+  ids_.push_back(id);
+
+  return;
+}
+
+void TriggerSummaryProducerAOD::fillFilterObjectMember(const int& offset, const int& id, const edm::Ref<reco::PFMETCollection> & ref) {
+
+  using namespace trigger;
+
+  if ( (id==TriggerTHT) || (id==TriggerTET) ) {
+    keys_.push_back(offset+4*ref.key()+1);
+  } else if ( (id==TriggerMETSig) || (id==TriggerMHTSig) ) {
+    keys_.push_back(offset+4*ref.key()+2);
+  } else if ( (id==TriggerELongit) || (id==TriggerHLongit) ) {
+    keys_.push_back(offset+4*ref.key()+3);
+  } else {
+    keys_.push_back(offset+4*ref.key()+0);
   }
   ids_.push_back(id);
 

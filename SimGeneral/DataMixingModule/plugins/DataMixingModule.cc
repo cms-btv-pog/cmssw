@@ -36,7 +36,8 @@ namespace edm
 {
 
   // Constructor 
-  DataMixingModule::DataMixingModule(const edm::ParameterSet& ps) : BMixingModule(ps),
+  DataMixingModule::DataMixingModule(const edm::ParameterSet& ps, MixingCache::Config const* globalConf) :
+    BMixingModule(ps, globalConf),
     EBPileInputTag_(ps.getParameter<edm::InputTag>("EBPileInputTag")),
     EEPileInputTag_(ps.getParameter<edm::InputTag>("EEPileInputTag")),
     ESPileInputTag_(ps.getParameter<edm::InputTag>("ESPileInputTag")),
@@ -130,7 +131,7 @@ namespace edm
 
       produces<HBHEUpgradeDigiCollection>("HBHEUpgradeDigiCollection");
       produces<HFUpgradeDigiCollection>("HFUpgradeDigiCollection");
-
+      produces<QIE10DigiCollection>("HFQIE10DigiCollection");
 
       if(MergeHcalDigisProd_) {
 	//        edm::ConsumesCollector iC(consumesCollector());
@@ -237,6 +238,13 @@ namespace edm
     produces< std::vector<TrackingParticle> >(ps.getParameter<std::string>("TrackingParticleCollectionDM"));
     produces< std::vector<TrackingVertex> >(ps.getParameter<std::string>("TrackingParticleCollectionDM"));
 
+    produces< edm::DetSetVector<StripDigiSimLink> >(ps.getParameter<std::string>("StripDigiSimLinkCollectionDM"));
+    produces< edm::DetSetVector<PixelDigiSimLink> >(ps.getParameter<std::string>("PixelDigiSimLinkCollectionDM"));
+    produces< MuonDigiCollection<DTLayerId,DTDigiSimLink> >(ps.getParameter<std::string>("DTDigiSimLinkDM"));
+    produces< edm::DetSetVector<RPCDigiSimLink> >(ps.getParameter<std::string>("RPCDigiSimLinkDM"));
+    produces< edm::DetSetVector<StripDigiSimLink> >(ps.getParameter<std::string>("CSCStripDigiSimLinkDM"));
+    produces< edm::DetSetVector<StripDigiSimLink> >(ps.getParameter<std::string>("CSCWireDigiSimLinkDM"));
+
     TrackingParticleWorker_ = new DataMixingTrackingParticleWorker(ps, consumesCollector());
 
   }
@@ -293,6 +301,9 @@ namespace edm
     if( addMCDigiNoise_ && MergeHcalDigisProd_) {
       HcalDigiWorkerProd_->initializeEvent( e, ES );
     }
+
+    TrackingParticleWorker_->initializeEvent( e, ES );
+
   }
   
 
@@ -558,7 +569,7 @@ namespace edm
 
   void DataMixingModule::beginLuminosityBlock(LuminosityBlock const& l1, EventSetup const& c) {
     BMixingModule::beginLuminosityBlock(l1, c);
-    EcalDigiWorkerProd_->beginLuminosityBlock(l1,c);
+    if(addMCDigiNoise_ && EcalDigiWorkerProd_) EcalDigiWorkerProd_->beginLuminosityBlock(l1,c);
   }
 
   void DataMixingModule::endLuminosityBlock(LuminosityBlock const& l1, EventSetup const& c) {

@@ -15,11 +15,10 @@
 
 namespace edm {
   void loadType(TypeID const& type) {
-    checkClassDictionaries(type, true);
-    if (!missingTypes().empty()) {
-      TypeSet missing = missingTypes();
-      missingTypes().clear();
-      for_all(missing, loadType);
+    TypeSet missingTypes;
+    checkClassDictionaries(type,missingTypes,true);
+    if (!missingTypes.empty()) {
+      for_all(missingTypes, loadType);
     }
   }
 
@@ -60,12 +59,6 @@ namespace edm {
   namespace {
     TClass* getRootClass(std::string const& name) {
       TClass* tc = TClass::GetClass(name.c_str());    
-      
-      // get ROOT TClass for this product
-      // CINT::Type* cint_type = CINT::Type::get(typ_ref);
-      // tc_ = cint_type->rootClass();
-      // TClass* tc = TClass::GetClass(typeid(se));
-      // tc_ = TClass::GetClass("edm::SendEvent");
       
       if(tc == 0) {
 	throw edm::Exception(errors::Configuration,"getRootClass")

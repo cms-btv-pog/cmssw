@@ -18,6 +18,12 @@ do
 
     if [ "$Run_numb" == "$1" ]; then continue; fi
 
+    #Run2015A
+    if [ $Run_numb -gt 246907 ]; then
+        DataLocalDir='Data2015'
+        DataOfflineDir='Run2015'
+    else
+
     #2015 Commissioning period (since January)
     if [ $Run_numb -gt 232881 ]; then
 	DataLocalDir='Data2015'
@@ -39,6 +45,7 @@ do
 		fi
 	    fi
 	fi
+    fi
     fi
     #loop over datasets
     #if Cosmics, do StreamExpressCosmics as well
@@ -122,7 +129,7 @@ do
     fi
 
 #Temporary fix to remove hidden ASCII characters
-    GLOBALTAG=`echo $GLOBALTAG | cut -c 9-16`
+    GLOBALTAG=`echo $GLOBALTAG | cut -c 9-${#GLOBALTAG}`
 #    GLOBALTAG=`sed -i 's/[\d128-\d255]//g' <<< "${GLOBALTAG}"`
 #    GLOBALTAG=`echo $GLOBALTAG | sed 's/[\d128-\d255]//'`
 #    echo `expr length $GLOBALTAG`
@@ -151,6 +158,17 @@ do
     echo " Creating the list of bad modules "
     
     listbadmodule ${file_path}/$dqmFileName PCLBadComponents.log
+   if [ "$thisDataset" != "StreamExpress" ] ; then
+       sefile=QualityTest_run${Run_numb}.txt
+
+       if [ "$thisDataset" == "Cosmics" ]; then
+           python ../../DQM/SiStripMonitorClient/scripts/findBadModT9.py -p $sefile -s /data/users/event_display/${DataLocalDir}/Cosmics/${nnn}/${Run_numb}/StreamExpressCosmics/${sefile}
+       else
+
+           python ../../DQM/SiStripMonitorClient/scripts/findBadModT9.py -p $sefile -s /data/users/event_display/${DataLocalDir}/Beam/${nnn}/${Run_numb}/StreamExpress/${sefile}
+
+       fi
+   fi
 
 #    mv QualityTest*txt $Run_numb/$thisDataset
 
@@ -163,7 +181,7 @@ do
     fi
 
 ## Producing the PrimaryVertex/BeamSpot quality test by LS..
-    if [ $thisDataset == "MinimumBias" -o $thisDataset == "Jet" ]; then	
+    if [ "$thisDataset" != "Cosmics" ]  &&  [ "$thisDataset" != "StreamExpress" ]  &&  [ "$thisDataset" != "StreamExpressCosmics" ]; then
 	echo " Creating the BeamSpot Calibration certification summary:"
 
 	lsbs_cert  ${file_path}/$dqmFileName

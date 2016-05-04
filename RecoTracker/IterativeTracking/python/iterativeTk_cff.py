@@ -1,7 +1,7 @@
 import FWCore.ParameterSet.Config as cms
 
-from RecoTracker.IterativeTracking.InitialStep_cff import *
 from RecoTracker.IterativeTracking.InitialStepPreSplitting_cff import *
+from RecoTracker.IterativeTracking.InitialStep_cff import *
 from RecoTracker.IterativeTracking.DetachedTripletStep_cff import *
 from RecoTracker.IterativeTracking.LowPtTripletStep_cff import *
 from RecoTracker.IterativeTracking.PixelPairStep_cff import *
@@ -32,3 +32,22 @@ iterTracking = cms.Sequence(InitialStepPreSplitting*
                             ConvStep*
                             conversionStepTracks
                             )
+
+from Configuration.StandardSequences.Eras import eras
+eras.trackingLowPU.toReplaceWith(iterTracking, cms.Sequence(
+    InitialStepPreSplitting*
+    InitialStep*
+    LowPtTripletStep*
+    PixelPairStep*
+    DetachedTripletStep*
+    MixedTripletStep*
+    PixelLessStep*
+    TobTecStep*
+    earlyGeneralTracks*
+    muonSeededStep*
+    preDuplicateMergingGeneralTracks*
+    generalTracksSequence*
+    ConvStep*
+    conversionStepTracks
+))
+

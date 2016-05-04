@@ -35,13 +35,29 @@
 
 
 #include<iostream>
+#include <algorithm>
+#include <cctype>
 
+namespace {
 template <class T> T sqr( T t) {return t*t;}
+}
 
 
 using namespace PixelRecoUtilities;
 using namespace std;
 using namespace ctfseeding; 
+
+RectangularEtaPhiTrackingRegion::UseMeasurementTracker RectangularEtaPhiTrackingRegion::stringToUseMeasurementTracker(const std::string& name) {
+  std::string tmp = name;
+  std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::tolower);
+  if(tmp == "never")
+    return UseMeasurementTracker::kNever;
+  if(tmp == "forsistrips")
+    return UseMeasurementTracker::kForSiStrips;
+  if(tmp == "always")
+    return UseMeasurementTracker::kAlways;
+  throw cms::Exception("Configuration") << "Got invalid string '" << name << "', valid values are 'Never', 'ForSiStrips', 'Always' (case insensitive)";
+}
 
 void RectangularEtaPhiTrackingRegion:: initEtaRange( const GlobalVector & dir, const Margin& margin) {
   float eta = dir.eta();
@@ -128,7 +144,7 @@ checkRZOld(const DetLayer* layer, const TrackingRecHit *outerHit,const edm::Even
   }
 }
 
-OuterEstimator *
+std::unique_ptr<OuterEstimator>
   RectangularEtaPhiTrackingRegion::estimator(const BarrelDetLayer* layer,const edm::EventSetup& iSetup) const
 {
 
@@ -184,13 +200,13 @@ OuterEstimator *
     phiRange = phiPrediction(detRWindow.mean()); 
   }
 
-  return new OuterEstimator(
+  return std::make_unique<OuterEstimator>(
 			    OuterDetCompatibility( layer, phiRange, detRWindow, hitZWindow),
 			    OuterHitCompatibility( phiPrediction, zPrediction ),
 			    iSetup);
 }
 
-OuterEstimator *
+std::unique_ptr<OuterEstimator>
 RectangularEtaPhiTrackingRegion::estimator(const ForwardDetLayer* layer,const edm::EventSetup& iSetup) const
 {
 
@@ -241,7 +257,7 @@ RectangularEtaPhiTrackingRegion::estimator(const ForwardDetLayer* layer,const ed
     hitRWindow = Range(w1.min(),w2.max()).intersection(detRWindow);
   }
 
-  return new OuterEstimator(
+  return std::make_unique<OuterEstimator>(
     OuterDetCompatibility( layer, phiRange, hitRWindow, detZWindow),
     OuterHitCompatibility( phiPrediction, rPrediction),iSetup );
 }
@@ -292,13 +308,12 @@ TrackingRegion::Hits RectangularEtaPhiTrackingRegion::hits(
   //ESTIMATOR
 
   const DetLayer * detLayer = layer.detLayer();
-  OuterEstimator * est = 0;
+  std::unique_ptr<OuterEstimator> est;
 
   bool measurementMethod = false;
   if(theMeasurementTrackerUsage == UseMeasurementTracker::kAlways) measurementMethod = true;
   else if(theMeasurementTrackerUsage == UseMeasurementTracker::kForSiStrips &&
-       !(detLayer->subDetector() == GeomDetEnumerators::PixelBarrel ||
-         detLayer->subDetector() == GeomDetEnumerators::PixelEndcap) ) measurementMethod = true;
+          GeomDetEnumerators::isTrackerStrip(detLayer->subDetector())) measurementMethod = true;
 
   if(measurementMethod) {
     edm::ESHandle<MagneticField> field;
@@ -308,10 +323,12 @@ TrackingRegion::Hits RectangularEtaPhiTrackingRegion::hits(
     const GlobalPoint vtx = origin();
     GlobalVector dir = direction();
     
-    if (detLayer->subDetector() == GeomDetEnumerators::PixelBarrel || (!theUseEtaPhi  && detLayer->location() == GeomDetEnumerators::barrel)){
+    if ((GeomDetEnumerators::isTrackerPixel(detLayer->subDetector()) && GeomDetEnumerators::isBarrel(detLayer->subDetector())) ||
+        (!theUseEtaPhi  && detLayer->location() == GeomDetEnumerators::barrel)) {
       const BarrelDetLayer& bl = dynamic_cast<const BarrelDetLayer&>(*detLayer);
       est = estimator(&bl,es);
-    } else if (detLayer->subDetector() == GeomDetEnumerators::PixelEndcap || (!theUseEtaPhi  && detLayer->location() == GeomDetEnumerators::endcap)) {
+    } else if ((GeomDetEnumerators::isTrackerPixel(detLayer->subDetector()) && GeomDetEnumerators::isEndcap(detLayer->subDetector())) ||
+               (!theUseEtaPhi  && detLayer->location() == GeomDetEnumerators::endcap)) {
       const ForwardDetLayer& fl = dynamic_cast<const ForwardDetLayer&>(*detLayer);
       est = estimator(&fl,es);
     }
@@ -321,7 +338,7 @@ TrackingRegion::Hits RectangularEtaPhiTrackingRegion::hits(
     MeasurementEstimator * findDetAndHits = &etaPhiEstimator;
     if (est){
       LogDebug("RectangularEtaPhiTrackingRegion")<<"use pixel specific estimator.";
-      findDetAndHits = est;
+      findDetAndHits = est.get();
     }
     else{
       LogDebug("RectangularEtaPhiTrackingRegion")<<"use generic etat phi estimator.";
@@ -390,7 +407,6 @@ TrackingRegion::Hits RectangularEtaPhiTrackingRegion::hits(
   }
   
   // std::cout << "RectangularEtaPhiTrackingRegion hits "  << result.size() << std::endl;
-  delete est;
 
   return result;
 }

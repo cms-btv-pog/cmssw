@@ -21,11 +21,12 @@ class DQMFileIterator {
     std::string filename;
 
     unsigned int file_ls;
-    std::size_t n_events;
+    std::size_t n_events_processed;
+    std::size_t n_events_accepted;
     std::string datafn;
 
     static LumiEntry load_json(const std::string& filename, int lumiNumber,
-                               unsigned int datafn_position);
+                               int datafn_position);
 
     std::string state;
   };
@@ -91,6 +92,7 @@ class DQMFileIterator {
   unsigned long delayMillis_;
   long nextLumiTimeoutMillis_;
   long forceFileCheckTimeoutMillis_;
+  bool flagScanOnce_;
 
   // file name position in the json file
   unsigned int datafnPosition_;
@@ -112,7 +114,7 @@ class DQMFileIterator {
   std::chrono::high_resolution_clock::time_point lastLumiLoad_;
 
   void collect(bool ignoreTimers);
-  void monUpdateLumi(const LumiEntry& lumi); 
+  void monUpdateLumi(const LumiEntry& lumi);
 
   /* this is for monitoring */
   edm::Service<DQMMonitoringService> mon_;

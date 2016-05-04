@@ -1,6 +1,8 @@
 import FWCore.ParameterSet.Config as cms
+from Configuration.StandardSequences.Eras import eras
 
 from RecoLuminosity.LumiProducer.lumiProducer_cff import *
+from RecoLuminosity.LumiProducer.bunchSpacingProducer_cfi import *
 from RecoLocalMuon.Configuration.RecoLocalMuon_cff import *
 from RecoLocalCalo.Configuration.RecoLocalCalo_cff import *
 from RecoTracker.Configuration.RecoTracker_cff import *
@@ -51,12 +53,17 @@ localreco_HcalNZS = cms.Sequence(trackerlocalreco+muonlocalreco+calolocalrecoNZS
 from RecoLocalCalo.Castor.Castor_cff import *
 from RecoLocalCalo.Configuration.hcalGlobalReco_cff import *
 
-globalreco = cms.Sequence(offlineBeamSpot*
+globalreco_tracking = cms.Sequence(offlineBeamSpot*
                           MeasurementTrackerEventPreSplitting* # unclear where to put this
                           siPixelClusterShapeCachePreSplitting* # unclear where to put this
                           standalonemuontracking*
                           trackingGlobalReco*
-                          vertexreco*
+                          vertexreco)
+_globalreco_trackingLowPU = globalreco_tracking.copy()
+_globalreco_trackingLowPU.replace(trackingGlobalReco, recopixelvertexing+trackingGlobalReco)
+eras.trackingLowPU.toReplaceWith(globalreco_tracking, _globalreco_trackingLowPU)
+
+globalreco = cms.Sequence(globalreco_tracking*
                           hcalGlobalRecoSequence*
                           particleFlowCluster*
                           ecalClusters*
@@ -91,7 +98,9 @@ highlevelreco = cms.Sequence(egammaHighLevelRecoPrePF*
 from FWCore.Modules.logErrorHarvester_cfi import *
 
 # "Export" Section
-reconstruction         = cms.Sequence(localreco*globalreco*highlevelreco*logErrorHarvester)
+reconstruction         = cms.Sequence(bunchSpacingProducer*localreco*globalreco*highlevelreco*logErrorHarvester)
+
+reconstruction_trackingOnly = cms.Sequence(bunchSpacingProducer*localreco*globalreco_tracking)
 
 #need a fully expanded sequence copy
 modulesToRemove = list() # copy does not work well
@@ -113,6 +122,9 @@ noTrackingAndDependent.append(siPixelClusters)
 noTrackingAndDependent.append(clusterSummaryProducer)
 noTrackingAndDependent.append(siPixelRecHitsPreSplitting)
 noTrackingAndDependent.append(MeasurementTrackerEventPreSplitting)
+noTrackingAndDependent.append(PixelLayerTriplets)
+noTrackingAndDependent.append(pixelTracks)
+noTrackingAndDependent.append(pixelVertices)
 modulesToRemove.append(dt1DRecHits)
 modulesToRemove.append(dt1DCosmicRecHits)
 modulesToRemove.append(csc2DRecHits)

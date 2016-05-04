@@ -1,4 +1,5 @@
 #include "RecoMET/METAlgorithms/interface/HcalHaloAlgo.h"
+#include <map>
 
 /*
   [class]:  HcalHaloAlgo
@@ -13,6 +14,9 @@ using namespace reco;
 
 #include <iomanip>
 bool CompareTime(const HBHERecHit* x, const HBHERecHit* y ){ return x->time() < y->time() ;}
+bool CompareTowers(const CaloTower* x, const CaloTower* y ){ 
+  return x->iphi()*1000 + x->ieta() < y->iphi()*1000 + y->ieta();
+}
 
 HcalHaloAlgo::HcalHaloAlgo()
 {
@@ -22,7 +26,12 @@ HcalHaloAlgo::HcalHaloAlgo()
   NHitsThreshold = 0;
 }
 
-HcalHaloData HcalHaloAlgo::Calculate(const CaloGeometry& TheCaloGeometry, edm::Handle<HBHERecHitCollection>& TheHBHERecHits)
+HcalHaloData HcalHaloAlgo::Calculate(const CaloGeometry& TheCaloGeometry, edm::Handle<HBHERecHitCollection>& TheHBHERecHits) {
+    edm::Handle<CaloTowerCollection> TheCaloTowers;
+    return Calculate(TheCaloGeometry, TheHBHERecHits, TheCaloTowers);
+}
+
+HcalHaloData HcalHaloAlgo::Calculate(const CaloGeometry& TheCaloGeometry, edm::Handle<HBHERecHitCollection>& TheHBHERecHits, edm::Handle<CaloTowerCollection>& TheCaloTowers)
 {
   HcalHaloData TheHcalHaloData;
   
@@ -119,6 +128,94 @@ HcalHaloData HcalHaloAlgo::Calculate(const CaloGeometry& TheCaloGeometry, edm::H
 	  TheHcalHaloData.GetPhiWedges().push_back( wedge );
 	}
     }
+
+
+  // Don't use HF.
+  int maxAbsIEta = 29;
+
+
+  std::map<int, float> iPhiHadEtMap;
+  std::vector<const CaloTower*> sortedCaloTowers;
+  for(CaloTowerCollection::const_iterator tower = TheCaloTowers->begin(); tower != TheCaloTowers->end(); tower++) {
+    if(abs(tower->ieta()) > maxAbsIEta) continue;
+
+    int iPhi = tower->iphi();
+    if(!iPhiHadEtMap.count(iPhi)) iPhiHadEtMap[iPhi] = 0.0;
+    iPhiHadEtMap[iPhi] += tower->hadEt();
+
+    if(tower->numProblematicHcalCells() > 0) sortedCaloTowers.push_back(&(*tower));
+
+  }
+
+
+  // Sort towers such that lowest iphi and ieta are first, highest last, and towers
+  // with same iphi value are consecutive. Then we can do everything else in one loop.
+  std::sort(sortedCaloTowers.begin(), sortedCaloTowers.end(), CompareTowers);
+
+  HaloTowerStrip strip;
+
+
+  int prevIEta = -99, prevIPhi = -99;
+  float prevHadEt = 0.;
+  float prevEmEt = 0.;
+  std::pair<uint8_t, CaloTowerDetId> prevPair, towerPair;
+  bool wasContiguous = true;
+
+  // Loop through and store a vector of pairs (problematicCells, DetId) for each contiguous strip we find
+  for(unsigned int i = 0; i < sortedCaloTowers.size(); i++) {
+    const CaloTower* tower = sortedCaloTowers[i];
+
+    towerPair = std::make_pair((uint8_t)tower->numProblematicHcalCells(), tower->id());
+
+    bool newIPhi = tower->iphi() != prevIPhi;
+    bool isContiguous = tower->ieta() == 1 ? tower->ieta() - 2 == prevIEta : tower->ieta() - 1 == prevIEta;
+
+    isContiguous = isContiguous || (tower->ieta() == -maxAbsIEta);
+    if(newIPhi) isContiguous = false;
+
+    if(!wasContiguous && isContiguous) {
+      strip.cellTowerIds.push_back(prevPair);
+      strip.cellTowerIds.push_back(towerPair);
+      strip.hadEt += prevHadEt + tower->hadEt();
+      strip.emEt += prevEmEt + tower->emEt();
+    }
+
+    if(wasContiguous && isContiguous) {
+      strip.cellTowerIds.push_back(towerPair);
+      strip.hadEt += tower->hadEt();
+      strip.emEt += tower->emEt();
+    }
+
+    if((wasContiguous && !isContiguous) || i == sortedCaloTowers.size()-1) { //ended the strip, so flush it
+
+      if(strip.cellTowerIds.size() > 3) {
+
+        int iPhi = strip.cellTowerIds.at(0).second.iphi();
+        int iPhiLower = (iPhi == 1) ? 72 : iPhi - 1;
+        int iPhiUpper = (iPhi == 72) ? 1 : iPhi + 1;
+
+        float energyRatio = 0.0;
+        if(iPhiHadEtMap.count(iPhiLower)) energyRatio += iPhiHadEtMap[iPhiLower];
+        if(iPhiHadEtMap.count(iPhiUpper)) energyRatio += iPhiHadEtMap[iPhiUpper];
+        iPhiHadEtMap[iPhi] = max(iPhiHadEtMap[iPhi], 0.001F);
+
+        energyRatio /= iPhiHadEtMap[iPhi];
+        strip.energyRatio = energyRatio;
+
+        TheHcalHaloData.getProblematicStrips().push_back( strip );
+
+      }
+      strip = HaloTowerStrip();
+    }
+
+    wasContiguous = isContiguous;
+    prevPair = towerPair;
+    prevEmEt = tower->emEt();
+    prevIPhi = tower->iphi();
+    prevIEta = tower->ieta();
+    prevHadEt = tower->hadEt();
+  }
+
   return TheHcalHaloData;
   
 }

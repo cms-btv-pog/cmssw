@@ -24,10 +24,13 @@ namespace impl {
   constexpr reco::TrackBase::TrackAlgorithm algoPriorityOrder[] ={
     reco::TrackBase::undefAlgorithm,
     reco::TrackBase::ctf,
-    reco::TrackBase::rs,
     reco::TrackBase::cosmics,
+    reco::TrackBase::duplicateMerge,
     reco::TrackBase::initialStep,
+    reco::TrackBase::highPtTripletStep,
+    reco::TrackBase::detachedQuadStep,
     reco::TrackBase::detachedTripletStep,
+    reco::TrackBase::lowPtQuadStep,
     reco::TrackBase::lowPtTripletStep,
     reco::TrackBase::pixelPairStep,
     reco::TrackBase::mixedTripletStep,
@@ -44,11 +47,8 @@ namespace impl {
     reco::TrackBase::globalMuon,
     reco::TrackBase::cosmicStandAloneMuon,
     reco::TrackBase::cosmicGlobalMuon,
-    reco::TrackBase::iter1LargeD0,
-    reco::TrackBase::iter2LargeD0,
-    reco::TrackBase::iter3LargeD0,
-    reco::TrackBase::iter4LargeD0,
-    reco::TrackBase::iter5LargeD0,
+    reco::TrackBase::reservedForUpgrades1,
+    reco::TrackBase::reservedForUpgrades2,
     reco::TrackBase::bTagGhostTracks,
     reco::TrackBase::beamhalo,
     reco::TrackBase::gsf,
@@ -58,7 +58,16 @@ namespace impl {
     reco::TrackBase::hltIter2,
     reco::TrackBase::hltIter3,
     reco::TrackBase::hltIter4,
-    reco::TrackBase::hltIterX
+    reco::TrackBase::hltIterX,
+    reco::TrackBase::hiRegitMuInitialStep,
+    reco::TrackBase::hiRegitMuPixelPairStep,
+    reco::TrackBase::hiRegitMuMixedTripletStep,
+    reco::TrackBase::hiRegitMuPixelLessStep,
+    reco::TrackBase::hiRegitMuDetachedTripletStep,
+    reco::TrackBase::hiRegitMuMuonSeededStepInOut,
+    reco::TrackBase::hiRegitMuMuonSeededStepOutIn,
+    reco::TrackBase::hiRegitMuLowPtTripletStep,
+    reco::TrackBase::hiRegitMuTobTecStep
   };
 
   static_assert(reco::TrackBase::algoSize == sizeof(algoPriorityOrder)/sizeof(unsigned int), "Please update me too after adding new enumerators to reco::TrackBase::TrackAlgorithm");

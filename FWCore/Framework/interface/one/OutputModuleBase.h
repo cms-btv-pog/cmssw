@@ -28,10 +28,8 @@
 #include <mutex>
 
 // user include files
-#include "DataFormats/Provenance/interface/BranchChildren.h"
 #include "DataFormats/Provenance/interface/BranchID.h"
 #include "DataFormats/Provenance/interface/BranchIDList.h"
-#include "DataFormats/Provenance/interface/ParentageID.h"
 #include "DataFormats/Provenance/interface/ModuleDescription.h"
 #include "DataFormats/Provenance/interface/SelectedProducts.h"
 
@@ -43,6 +41,7 @@
 #include "FWCore/Framework/interface/getAllTriggerNames.h"
 #include "FWCore/Framework/interface/SharedResourcesAcquirer.h"
 #include "FWCore/ParameterSet/interface/ParameterSetfwd.h"
+#include "FWCore/Utilities/interface/propagate_const.h"
 
 // forward declarations
 namespace edm {
@@ -60,8 +59,6 @@ namespace edm {
   }
 
   namespace one {
-    
-    typedef detail::TriggerResultsBasedEventSelector::handle_t Trig;
     
     class OutputModuleBase : public EDConsumerBase {
     public:
@@ -96,11 +93,9 @@ namespace edm {
       static const std::string& baseType();
       static void prevalidate(ConfigurationDescriptions& );
       
-      BranchChildren const& branchChildren() const {return branchChildren_;}
-      
       bool wantAllEvents() const {return wantAllEvents_;}
       
-      BranchIDLists const* branchIDLists() const;
+      BranchIDLists const* branchIDLists();
 
       ThinnedAssociationsHelper const* thinnedAssociationsHelper() const;
       
@@ -109,13 +104,11 @@ namespace edm {
       }
     protected:
       
-      Trig getTriggerResults(EventPrincipal const& ep, ModuleCallingContext const*) const;
-      
       ModuleDescription const& description() const;
       
       ParameterSetID selectorConfig() const { return selector_config_id_; }
 
-      void doPreallocate(PreallocationConfiguration const&) {}
+      void doPreallocate(PreallocationConfiguration const&);
 
       void doBeginJob();
       void doEndJob();
@@ -169,7 +162,8 @@ namespace edm {
       ModuleDescription moduleDescription_;
       
       bool wantAllEvents_;
-      mutable detail::TriggerResultsBasedEventSelector selectors_;
+      std::vector<detail::TriggerResultsBasedEventSelector> selectors_;
+      ParameterSet selectEvents_;
       // ID of the ParameterSet that configured the event selector
       // subsystem.
       ParameterSetID selector_config_id_;
@@ -177,17 +171,13 @@ namespace edm {
       // needed because of possible EDAliases.
       // filled in only if key and value are different.
       std::map<BranchID::value_type, BranchID::value_type> droppedBranchIDToKeptBranchID_;
-      std::unique_ptr<BranchIDLists> branchIDLists_;
+      edm::propagate_const<std::unique_ptr<BranchIDLists>> branchIDLists_;
       BranchIDLists const* origBranchIDLists_;
 
-      std::unique_ptr<ThinnedAssociationsHelper> thinnedAssociationsHelper_;
+
+      edm::propagate_const<std::unique_ptr<ThinnedAssociationsHelper>> thinnedAssociationsHelper_;
       std::map<BranchID, bool> keepAssociation_;
 
-      typedef std::map<BranchID, std::set<ParentageID> > BranchParents;
-      BranchParents branchParents_;
-      
-      BranchChildren branchChildren_;
-      
       SharedResourcesAcquirer resourcesAcquirer_;
       std::mutex mutex_;
 
@@ -218,6 +208,7 @@ namespace edm {
       
       void registerProductsAndCallbacks(OutputModuleBase const*, ProductRegistry const*) {}
 
+      bool prePrefetchSelection(StreamID id, EventPrincipal const&, ModuleCallingContext const*);
       
       // Do the end-of-file tasks; this is only called internally, after
       // the appropriate tests have been done.
@@ -253,9 +244,6 @@ namespace edm {
       void setModuleDescription(ModuleDescription const& md) {
         moduleDescription_ = md;
       }
-      
-      void updateBranchParents(EventPrincipal const& ep);
-      void fillDependencyGraph();
       
       bool limitReached() const {return remainingEvents_ == 0;}
     };

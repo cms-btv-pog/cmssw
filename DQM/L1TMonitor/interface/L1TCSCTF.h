@@ -83,6 +83,10 @@ class L1TCSCTF : public thread_unsafe::DQMEDAnalyzer {
   MonitorElement* csctfoccupancies;
   MonitorElement* csctfoccupancies_H;
 
+
+  MonitorElement* csctferrors_mpc;
+  MonitorElement* cscWireStripOverflow;
+
   //MonitorElement* runId_;
   //MonitorElement* lumisecId_;
 
@@ -177,7 +181,7 @@ class L1TCSCTF : public thread_unsafe::DQMEDAnalyzer {
   edm::InputTag gmtProducer, lctProducer, trackProducer, statusProducer, mbProducer;
   bool gangedME11a_; // needed this be set false for Run2
 
-  CSCSectorReceiverLUT* srLUTs_[5][2];
+  CSCSectorReceiverLUT* srLUTs_[5][2][6];
 
   const L1MuTriggerScales  *ts;
   const L1MuTriggerPtScale *tpts;

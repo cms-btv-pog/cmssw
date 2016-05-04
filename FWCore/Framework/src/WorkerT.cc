@@ -14,6 +14,7 @@
 #include "FWCore/Framework/interface/global/EDProducerBase.h"
 #include "FWCore/Framework/interface/global/EDFilterBase.h"
 #include "FWCore/Framework/interface/global/EDAnalyzerBase.h"
+#include "FWCore/Framework/interface/global/OutputModuleBase.h"
 
 #include "FWCore/Framework/interface/stream/EDProducerAdaptorBase.h"
 #include "FWCore/Framework/interface/stream/EDFilterAdaptorBase.h"
@@ -77,7 +78,7 @@ namespace edm{
 
     template<typename T, typename P>
     struct DoStreamBeginTrans {
-      inline void operator() (WorkerT<T>* iWorker, StreamID id, P& rp,
+      inline void operator() (WorkerT<T>* iWorker, StreamID id, P const& rp,
                               EventSetup const& c,
                               ModuleCallingContext const* mcc) {
         iWorker->callWorkerStreamBegin(0,id,rp,c, mcc);
@@ -86,7 +87,7 @@ namespace edm{
 
     template<typename T, typename P>
     struct DoStreamEndTrans {
-      inline void operator() (WorkerT<T>* iWorker, StreamID id, P& rp,
+      inline void operator() (WorkerT<T>* iWorker, StreamID id, P const& rp,
                               EventSetup const& c,
                               ModuleCallingContext const* mcc) {
         iWorker->callWorkerStreamEnd(0,id,rp,c, mcc);
@@ -94,7 +95,7 @@ namespace edm{
     };
   }
   
-  UnscheduledHandler* getUnscheduledHandler(EventPrincipal const& ep) {
+  UnscheduledHandler const* getUnscheduledHandler(EventPrincipal const& ep) {
     return ep.unscheduledHandler().get();
   }
 
@@ -114,7 +115,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDo(EventPrincipal& ep, EventSetup const& c, ModuleCallingContext const* mcc) {
+  WorkerT<T>::implDo(EventPrincipal const& ep, EventSetup const& c, ModuleCallingContext const* mcc) {
     std::shared_ptr<Worker> sentry(this,[&ep](Worker* obj) {obj->postDoEvent(ep);});
     return module_->doEvent(ep, c, activityRegistry(), mcc);
   }
@@ -122,7 +123,43 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoBegin(RunPrincipal& rp, EventSetup const& c, ModuleCallingContext const* mcc) {
+  WorkerT<T>::implDoPrePrefetchSelection(StreamID id,
+                                          EventPrincipal const& ep,
+                                         ModuleCallingContext const* mcc) {
+    return true;
+  }
+
+  template<>
+  inline
+  bool
+  WorkerT<OutputModule>::implDoPrePrefetchSelection(StreamID id,
+                                         EventPrincipal const& ep,
+                                         ModuleCallingContext const* mcc) {
+    return module_->prePrefetchSelection(id,ep,mcc);
+  }
+
+  template<>
+  inline
+  bool
+  WorkerT<edm::one::OutputModuleBase>::implDoPrePrefetchSelection(StreamID id,
+                                                    EventPrincipal const& ep,
+                                                    ModuleCallingContext const* mcc) {
+    return module_->prePrefetchSelection(id,ep,mcc);
+  }
+  
+  template<>
+  inline
+  bool
+  WorkerT<edm::global::OutputModuleBase>::implDoPrePrefetchSelection(StreamID id,
+                                                    EventPrincipal const& ep,
+                                                    ModuleCallingContext const* mcc) {
+    return module_->prePrefetchSelection(id,ep,mcc);
+  }
+  
+  template<typename T>
+  inline
+  bool
+  WorkerT<T>::implDoBegin(RunPrincipal const& rp, EventSetup const& c, ModuleCallingContext const* mcc) {
     module_->doBeginRun(rp, c, mcc);
     return true;
   }
@@ -130,7 +167,7 @@ namespace edm{
   template<typename T>
   template<typename D>
   void
-  WorkerT<T>::callWorkerStreamBegin(D, StreamID id, RunPrincipal& rp,
+  WorkerT<T>::callWorkerStreamBegin(D, StreamID id, RunPrincipal const& rp,
                                     EventSetup const& c,
                                     ModuleCallingContext const* mcc) {
     module_->doStreamBeginRun(id, rp, c, mcc);
@@ -139,7 +176,7 @@ namespace edm{
   template<typename T>
   template<typename D>
   void
-  WorkerT<T>::callWorkerStreamEnd(D, StreamID id, RunPrincipal& rp,
+  WorkerT<T>::callWorkerStreamEnd(D, StreamID id, RunPrincipal const& rp,
                                     EventSetup const& c,
                                     ModuleCallingContext const* mcc) {
     module_->doStreamEndRun(id, rp, c, mcc);
@@ -149,10 +186,10 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoStreamBegin(StreamID id, RunPrincipal& rp, EventSetup const& c,
+  WorkerT<T>::implDoStreamBegin(StreamID id, RunPrincipal const& rp, EventSetup const& c,
                                 ModuleCallingContext const* mcc) {
     typename boost::mpl::if_c<workerimpl::has_stream_functions<T>::value,
-    workerimpl::DoStreamBeginTrans<T,RunPrincipal>,
+    workerimpl::DoStreamBeginTrans<T,RunPrincipal const>,
     workerimpl::DoNothing>::type might_call;
     might_call(this,id,rp,c, mcc);
     return true;
@@ -161,10 +198,10 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoStreamEnd(StreamID id, RunPrincipal& rp, EventSetup const& c,
+  WorkerT<T>::implDoStreamEnd(StreamID id, RunPrincipal const& rp, EventSetup const& c,
                               ModuleCallingContext const* mcc) {
     typename boost::mpl::if_c<workerimpl::has_stream_functions<T>::value,
-    workerimpl::DoStreamEndTrans<T,RunPrincipal>,
+    workerimpl::DoStreamEndTrans<T,RunPrincipal const>,
     workerimpl::DoNothing>::type might_call;
     might_call(this,id,rp,c, mcc);
     return true;
@@ -173,7 +210,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoEnd(RunPrincipal& rp, EventSetup const& c,
+  WorkerT<T>::implDoEnd(RunPrincipal const& rp, EventSetup const& c,
                         ModuleCallingContext const* mcc) {
     module_->doEndRun(rp, c, mcc);
     return true;
@@ -182,7 +219,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoBegin(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+  WorkerT<T>::implDoBegin(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                           ModuleCallingContext const* mcc) {
     module_->doBeginLuminosityBlock(lbp, c, mcc);
     return true;
@@ -191,7 +228,7 @@ namespace edm{
   template<typename T>
   template<typename D>
   void
-  WorkerT<T>::callWorkerStreamBegin(D, StreamID id, LuminosityBlockPrincipal& rp,
+  WorkerT<T>::callWorkerStreamBegin(D, StreamID id, LuminosityBlockPrincipal const& rp,
                                     EventSetup const& c,
                                     ModuleCallingContext const* mcc) {
     module_->doStreamBeginLuminosityBlock(id, rp, c, mcc);
@@ -200,7 +237,7 @@ namespace edm{
   template<typename T>
   template<typename D>
   void
-  WorkerT<T>::callWorkerStreamEnd(D, StreamID id, LuminosityBlockPrincipal& rp,
+  WorkerT<T>::callWorkerStreamEnd(D, StreamID id, LuminosityBlockPrincipal const& rp,
                                   EventSetup const& c,
                                   ModuleCallingContext const* mcc) {
     module_->doStreamEndLuminosityBlock(id, rp, c, mcc);
@@ -210,7 +247,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-    WorkerT<T>::implDoStreamBegin(StreamID id, LuminosityBlockPrincipal& lbp, EventSetup const& c,
+    WorkerT<T>::implDoStreamBegin(StreamID id, LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                                   ModuleCallingContext const* mcc) {
     typename boost::mpl::if_c<workerimpl::has_stream_functions<T>::value,
     workerimpl::DoStreamBeginTrans<T,LuminosityBlockPrincipal>,
@@ -222,7 +259,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoStreamEnd(StreamID id, LuminosityBlockPrincipal& lbp, EventSetup const& c,
+  WorkerT<T>::implDoStreamEnd(StreamID id, LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                               ModuleCallingContext const* mcc) {
     typename boost::mpl::if_c<workerimpl::has_stream_functions<T>::value,
     workerimpl::DoStreamEndTrans<T,LuminosityBlockPrincipal>,
@@ -235,7 +272,7 @@ namespace edm{
   template<typename T>
   inline
   bool
-  WorkerT<T>::implDoEnd(LuminosityBlockPrincipal& lbp, EventSetup const& c,
+  WorkerT<T>::implDoEnd(LuminosityBlockPrincipal const& lbp, EventSetup const& c,
                         ModuleCallingContext const* mcc) {
     module_->doEndLuminosityBlock(lbp, c, mcc);
     return true;
@@ -361,6 +398,8 @@ namespace edm{
   Worker::Types WorkerT<edm::global::EDFilterBase>::moduleType() const { return Worker::kFilter;}
   template<>
   Worker::Types WorkerT<edm::global::EDAnalyzerBase>::moduleType() const { return Worker::kAnalyzer;}
+  template<>
+  Worker::Types WorkerT<edm::global::OutputModuleBase>::moduleType() const { return Worker::kOutputModule;}
 
 
   template<>
@@ -383,6 +422,7 @@ namespace edm{
   template class WorkerT<global::EDProducerBase>;
   template class WorkerT<global::EDFilterBase>;
   template class WorkerT<global::EDAnalyzerBase>;
+  template class WorkerT<global::OutputModuleBase>;
   template class WorkerT<stream::EDProducerAdaptorBase>;
   template class WorkerT<stream::EDFilterAdaptorBase>;
   template class WorkerT<stream::EDAnalyzerAdaptorBase>;

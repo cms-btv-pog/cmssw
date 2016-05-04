@@ -18,7 +18,6 @@
 #include "TrackingTools/TrajectoryState/interface/PerigeeConversions.h"
 #include "TrackingTools/Records/interface/TransientRecHitRecord.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
-#include "Validation/RecoTrack/interface/MTVHistoProducerAlgoFactory.h"
 #include "SimGeneral/TrackingAnalysis/interface/TrackingParticleNumberOfLayers.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingVertex.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingVertexContainer.h"
@@ -36,13 +35,9 @@ using namespace edm;
 
 typedef edm::Ref<edm::HepMCProduct, HepMC::GenParticle > GenParticleRef;
 
-TrackerSeedValidator::TrackerSeedValidator(const edm::ParameterSet& pset):MultiTrackValidatorBase(pset, consumesCollector(),true){
-  //theExtractor = IsoDepositExtractorFactory::get()->create( extractorName, extractorPSet, consumesCollector());
-
-  ParameterSet psetForHistoProducerAlgo = pset.getParameter<ParameterSet>("histoProducerAlgoBlock");
-  string histoProducerAlgoName = psetForHistoProducerAlgo.getParameter<string>("ComponentName");
-  histoProducerAlgo_ = MTVHistoProducerAlgoFactory::get()->create(histoProducerAlgoName ,psetForHistoProducerAlgo, consumesCollector());
-
+TrackerSeedValidator::TrackerSeedValidator(const edm::ParameterSet& pset):
+  MultiTrackValidatorBase(pset, consumesCollector(),true),
+  histoProducerAlgo_(std::make_unique<MTVHistoProducerAlgoForTracker>(pset.getParameter<ParameterSet>("histoProducerAlgoBlock"), consumesCollector())) {
   dirName_ = pset.getParameter<std::string>("dirName");
 
   tpSelector = TrackingParticleSelector(pset.getParameter<double>("ptMinTP"),
@@ -64,12 +59,9 @@ TrackerSeedValidator::TrackerSeedValidator(const edm::ParameterSet& pset):MultiT
   }
 }
 
-TrackerSeedValidator::~TrackerSeedValidator(){delete histoProducerAlgo_;}
+TrackerSeedValidator::~TrackerSeedValidator() {}
 
 void TrackerSeedValidator::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::EventSetup const& setup) {
-  setup.get<IdealMagneticFieldRecord>().get(theMF);
-  setup.get<TransientRecHitRecord>().get(builderName,theTTRHBuilder);
-
   {
     ibook.cd();
     ibook.setCurrentFolder(dirName_ + "simulation");
@@ -123,6 +115,12 @@ void TrackerSeedValidator::analyze(const edm::Event& event, const edm::EventSetu
   setup.get<TrackerTopologyRcd>().get(httopo);
   const TrackerTopology& ttopo = *httopo;
 
+  edm::ESHandle<TransientTrackingRecHitBuilder> theTTRHBuilder;
+  setup.get<TransientRecHitRecord>().get(builderName,theTTRHBuilder);
+
+  edm::ESHandle<MagneticField> theMF;
+  setup.get<IdealMagneticFieldRecord>().get(theMF);
+
   edm::Handle<TrackingParticleCollection>  TPCollectionHeff ;
   event.getByToken(label_tp_effic,TPCollectionHeff);
   const TrackingParticleCollection tPCeff = *(TPCollectionHeff.product());
@@ -148,10 +146,6 @@ void TrackerSeedValidator::analyze(const edm::Event& event, const edm::EventSetu
       break;
     }
   }
-
-  edm::Handle<TrackingVertexCollection> tvH;
-  event.getByToken(label_tv,tvH);
-  TrackingVertexCollection tv = *tvH;
 
   // Calculate the number of 3D layers for TPs
   //
@@ -278,8 +272,8 @@ void TrackerSeedValidator::analyze(const edm::Event& event, const edm::EventSetu
 	}
 
 	double dR=0;//fixme: plots vs dR not implemented for now
-	histoProducerAlgo_->fill_recoAssociated_simTrack_histos(w,*tp,tp->momentum(),tp->vertex(),dxySim,dzSim,nSimHits,nSimLayers,nSimPixelLayers,nSimStripMonoAndStereoLayers,
-								matchedTrackPointer,puinfo.getPU_NumInteractions(),dR);
+	histoProducerAlgo_->fill_recoAssociated_simTrack_histos(w,*tp,tp->momentum(),tp->vertex(),dxySim,dzSim,0,0,nSimHits,nSimLayers,nSimPixelLayers,nSimStripMonoAndStereoLayers,
+								matchedTrackPointer,puinfo.getPU_NumInteractions(),dR, nullptr);
 
 	sts++;
 	if (matchedTrackPointer) asts++;
@@ -364,7 +358,7 @@ void TrackerSeedValidator::analyze(const edm::Event& event, const edm::EventSetu
 	}
 
 	double dR = 0.;//fixme: plots vs dR not implemented for now
-	histoProducerAlgo_->fill_generic_recoTrack_histos(w,*trackFromSeed,bs.position(),isSimMatched,isSigSimMatched,
+	histoProducerAlgo_->fill_generic_recoTrack_histos(w,*trackFromSeed,bs.position(), nullptr, isSimMatched,isSigSimMatched,
 							  isChargeMatched, numAssocSeeds, 
 							  puinfo.getPU_NumInteractions(),
 							  nSimHits, sharedFraction, dR);

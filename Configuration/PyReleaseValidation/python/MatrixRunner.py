@@ -60,7 +60,7 @@ class MatrixRunner(object):
                 continue
     	    
     	    print '\nPreparing to run %s %s' % (wf.numId, item)
-          
+            sys.stdout.flush()
             current = WorkFlowRunner(wf,noRun,dryRun,cafVeto, opt.dasOptions, opt.jobReports, opt.nThreads)
     	    self.threadList.append(current)
     	    current.start()
@@ -89,12 +89,13 @@ class MatrixRunner(object):
                 count(totfailed,pingle.nfail)
                 report+=pingle.report
                 self.runDirs[pingle.wf.numId]=pingle.wfDir
-            except Exception, e:
+            except Exception as e:
                 msg = "ERROR retrieving info from thread: " + str(e)
                 report += msg
                 
         report+=' '.join(map(str,totpassed))+' tests passed, '+' '.join(map(str,totfailed))+' failed\n'
         print report
+        sys.stdout.flush()
 
         runall_report_name='runall-report-step123-.log'
         runall_report=open(runall_report_name,'w')

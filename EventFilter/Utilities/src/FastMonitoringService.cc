@@ -11,14 +11,23 @@
 #include "FWCore/ServiceRegistry/interface/StreamContext.h"
 #include "FWCore/ServiceRegistry/interface/PathContext.h"
 #include "EventFilter/Utilities/interface/EvFDaqDirector.h"
+#include "EventFilter/Utilities/interface/FedRawDataInputSource.h"
 #include "EventFilter/Utilities/interface/FileIO.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/UnixSignalHandlers.h"
 
 #include "FWCore/ServiceRegistry/interface/ModuleCallingContext.h"
 #include "DataFormats/Provenance/interface/ModuleDescription.h"
+using namespace jsoncollector;
+
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 
 constexpr double throughputFactor() {return (1000000)/double(1024*1024);}
+
+static const int nReservedModules = 64;
+static const int nSpecialModules = 7;
+static const int nReservedPaths = 1;
 
 namespace evf{
 
@@ -32,19 +41,18 @@ namespace evf{
   FastMonitoringService::FastMonitoringService(const edm::ParameterSet& iPS, 
 				       edm::ActivityRegistry& reg) : 
     MicroStateService(iPS,reg)
-    ,encModule_(33)
+    ,encModule_(nReservedModules)
     ,nStreams_(0)//until initialized
     ,sleepTime_(iPS.getUntrackedParameter<int>("sleepTime", 1))
-    ,fastMonIntervals_(iPS.getUntrackedParameter<unsigned int>("fastMonIntervals", 1))
-    ,microstateDefPath_(iPS.getUntrackedParameter<std::string> ("microstateDefPath", std::string(getenv("CMSSW_BASE"))+"/src/EventFilter/Utilities/plugins/microstatedef.jsd"))
-    ,fastMicrostateDefPath_(iPS.getUntrackedParameter<std::string>("fastMicrostateDefPath", microstateDefPath_))
-    ,fastName_(iPS.getUntrackedParameter<std::string>("fastName", "fastmoni"))
-    ,slowName_(iPS.getUntrackedParameter<std::string>("slowName", "slowmoni"))
+    ,fastMonIntervals_(iPS.getUntrackedParameter<unsigned int>("fastMonIntervals", 2))
+    ,fastName_("fastmoni")
+    ,slowName_("slowmoni")
     ,totalEventsProcessed_(0)
   {
     reg.watchPreallocate(this, &FastMonitoringService::preallocate);//receiving information on number of threads
     reg.watchJobFailure(this,&FastMonitoringService::jobFailure);//global
 
+    reg.watchPreBeginJob(this,&FastMonitoringService::preBeginJob);
     reg.watchPreModuleBeginJob(this,&FastMonitoringService::preModuleBeginJob);//global
     reg.watchPostBeginJob(this,&FastMonitoringService::postBeginJob);
     reg.watchPostEndJob(this,&FastMonitoringService::postEndJob);
@@ -72,6 +80,20 @@ namespace evf{
     reg.watchPreStreamEarlyTermination(this,&FastMonitoringService::preStreamEarlyTermination);
     reg.watchPreGlobalEarlyTermination(this,&FastMonitoringService::preGlobalEarlyTermination);
     reg.watchPreSourceEarlyTermination(this,&FastMonitoringService::preSourceEarlyTermination);
+
+    //find microstate definition path (required by the module)
+    struct stat statbuf;
+    std::string microstateBaseSuffix = "src/EventFilter/Utilities/plugins/microstatedef.jsd";
+    std::string microstatePath = std::string(getenv("CMSSW_BASE")) + "/" + microstateBaseSuffix;
+    if (stat(microstatePath.c_str(), &statbuf)) {
+      microstatePath = std::string(getenv("CMSSW_RELEASE_BASE")) + "/" + microstateBaseSuffix;
+      if (stat(microstatePath.c_str(), &statbuf)) {
+        microstatePath = microstateBaseSuffix;
+        if (stat(microstatePath.c_str(), &statbuf))
+          throw cms::Exception("FastMonitoringService") << "microstate definition file not found";
+      }
+    }
+    fastMicrostateDefPath_ = microstateDefPath_ = microstatePath;
   }
 
 
@@ -79,28 +101,56 @@ namespace evf{
   {
   }
 
-
-  std::string FastMonitoringService::makePathLegenda(){
-    //taken from first stream
-    std::ostringstream ost;
-    for(int i = 0;
-	i < encPath_[0].current_;
-	i++)
-      ost<<i<<"="<<*((std::string *)(encPath_[0].decode(i)))<<" ";
-    return ost.str();
+  void FastMonitoringService::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
+  {
+    edm::ParameterSetDescription desc;
+    desc.setComment("Service for File-based DAQ monitoring and event accounting");
+    desc.addUntracked<int> ("sleepTime",1)->setComment("Sleep time of the monitoring thread");
+    desc.addUntracked<unsigned int> ("fastMonIntervals",2)->setComment("Modulo of sleepTime intervals on which fastmon file is written out");
+    desc.setAllowAnything();
+    descriptions.add("FastMonitoringService", desc);
   }
 
 
-  std::string FastMonitoringService::makeModuleLegenda()
-  {  
-    std::ostringstream ost;
+  std::string FastMonitoringService::makePathLegendaJson() {
+    Json::Value legendaVector(Json::arrayValue);
+    for(int i = 0; i < encPath_[0].current_; i++)
+      legendaVector.append(Json::Value(*(static_cast<const std::string *>(encPath_[0].decode(i)))));
+    Json::Value valReserved(nReservedPaths);
+    Json::Value pathLegend;
+    pathLegend["names"]=legendaVector;
+    pathLegend["reserved"]=valReserved;
+    Json::StyledWriter writer;
+    return writer.write(pathLegend);
+  }
+
+  std::string FastMonitoringService::makeModuleLegendaJson(){
+    Json::Value legendaVector(Json::arrayValue);
     for(int i = 0; i < encModule_.current_; i++)
-      ost<<i<<"="<<((const edm::ModuleDescription *)(encModule_.decode(i)))->moduleLabel()<<" ";
-    return ost.str();
+       legendaVector.append(Json::Value((static_cast<const edm::ModuleDescription *>(encModule_.decode(i)))->moduleLabel()));
+    Json::Value valReserved(nReservedModules);
+    Json::Value valSpecial(nSpecialModules);
+    Json::Value valOutputModules(nOutputModules_);
+    Json::Value moduleLegend;
+    moduleLegend["names"]=legendaVector;
+    moduleLegend["reserved"]=valReserved;
+    moduleLegend["special"]=valSpecial;
+    moduleLegend["output"]=valOutputModules;
+    Json::StyledWriter writer;
+    return writer.write(moduleLegend);
   }
-
 
   void FastMonitoringService::preallocate(edm::service::SystemBounds const & bounds)
+  {
+    nStreams_=bounds.maxNumberOfStreams();
+    nThreads_=bounds.maxNumberOfThreads();
+    //this should already be >=1
+    if (nStreams_==0) nStreams_=1;
+    if (nThreads_==0) nThreads_=1;
+  }
+
+  void FastMonitoringService::preBeginJob(edm::PathsAndConsumesOfModulesBase const&,
+                                          edm::ProcessContext const& pc)
   {
 
     // FIND RUN DIRECTORY
@@ -111,6 +161,7 @@ namespace evf{
       throw cms::Exception("FastMonitoringService") << "EvFDaqDirector is not present";
     
     }
+    emptyLumisectionMode_ = edm::Service<evf::EvFDaqDirector>()->emptyLumisectionMode();
     boost::filesystem::path runDirectory(edm::Service<evf::EvFDaqDirector>()->baseRunDir());
     workingDirectory_ = runDirectory_ = runDirectory;
     workingDirectory_ /= "mon";
@@ -131,23 +182,22 @@ namespace evf{
     fastPath_ = fast.string();
 
     std::ostringstream moduleLegFile;
+    std::ostringstream moduleLegFileJson;
     moduleLegFile << "microstatelegend_pid" << std::setfill('0') << std::setw(5) << getpid() << ".leg";
+    moduleLegFileJson << "microstatelegend_pid" << std::setfill('0') << std::setw(5) << getpid() << ".jsn";
     moduleLegendFile_  = (workingDirectory_/moduleLegFile.str()).string();
+    moduleLegendFileJson_  = (workingDirectory_/moduleLegFileJson.str()).string();
 
     std::ostringstream pathLegFile;
+    std::ostringstream pathLegFileJson;
     pathLegFile << "pathlegend_pid" << std::setfill('0') << std::setw(5) << getpid() << ".leg";
     pathLegendFile_  = (workingDirectory_/pathLegFile.str()).string();
+    pathLegFileJson << "pathlegend_pid" << std::setfill('0') << std::setw(5) << getpid() << ".jsn";
+    pathLegendFileJson_  = (workingDirectory_/pathLegFileJson.str()).string();
 
     LogDebug("FastMonitoringService") << "Initializing FastMonitor with microstate def path -: "
 			                  << microstateDefPath_;
 			                  //<< encPath_.current_ + 1 << " " << encModule_.current_ + 1
-
-    nStreams_=bounds.maxNumberOfStreams();
-    nThreads_=bounds.maxNumberOfThreads();
-
-    //this should already be >=1
-    if (nStreams_==0) nStreams_=1;
-    if (nThreads_==0) nThreads_=1;
 
     /*
      * initialize the fast monitor with:
@@ -159,7 +209,7 @@ namespace evf{
     macrostate_=FastMonitoringThread::sInit;
 
     for(unsigned int i = 0; i < (mCOUNT); i++)
-      encModule_.updateReserved((void*)(reservedMicroStateNames+i));
+      encModule_.updateReserved(static_cast<const void*>(reservedMicroStateNames+i));
     encModule_.completeReservedWithDummies();
 
     for (unsigned int i=0;i<nStreams_;i++) {
@@ -171,7 +221,7 @@ namespace evf{
 
        //path (mini) state
        encPath_.emplace_back(0);
-       encPath_[i].update((void*)&nopath_);
+       encPath_[i].update(static_cast<const void*>(&nopath_));
        eventCountForPathInit_.push_back(0);
        firstEventId_.push_back(0);
        collectedPathList_.push_back(new std::atomic<bool>(0));
@@ -215,11 +265,10 @@ namespace evf{
     if (to==edm::TerminationOrigin::ExceptionFromThisContext) context =  " FromThisContext ";
     if (to==edm::TerminationOrigin::ExceptionFromAnotherContext) context =  " FromAnotherContext";
     if (to==edm::TerminationOrigin::ExternalSignal) context = " FromExternalSignal";
-    edm::LogInfo("FastMonitoringService") << " STREAM " << sc.streamID().value() << " earlyTermination -: ID:"<< sc.eventID() 
+    edm::LogWarning("FastMonitoringService") << " STREAM " << sc.streamID().value() << " earlyTermination -: ID:"<< sc.eventID() 
                                           << " LS:" << sc.eventID().luminosityBlock() << " " << context;
     std::lock_guard<std::mutex> lock(fmt_.monlock_);
     exceptionInLS_.push_back(sc.eventID().luminosityBlock());
-    //exception_detected_=true; 
   }
 
   void FastMonitoringService::preGlobalEarlyTermination(edm::GlobalContext const& gc, edm::TerminationOrigin to)
@@ -228,11 +277,10 @@ namespace evf{
     if (to==edm::TerminationOrigin::ExceptionFromThisContext) context =  " FromThisContext ";
     if (to==edm::TerminationOrigin::ExceptionFromAnotherContext) context =  " FromAnotherContext";
     if (to==edm::TerminationOrigin::ExternalSignal) context = " FromExternalSignal";
-    edm::LogInfo("FastMonitoringService") << " GLOBAL " << "earlyTermination -: LS:"
+    edm::LogWarning("FastMonitoringService") << " GLOBAL " << "earlyTermination -: LS:"
                                           << gc.luminosityBlockID().luminosityBlock() << " " << context;
     std::lock_guard<std::mutex> lock(fmt_.monlock_);
     exceptionInLS_.push_back(gc.luminosityBlockID().luminosityBlock());
-    //exception_detected_=true; 
   }
 
   void FastMonitoringService::preSourceEarlyTermination(edm::TerminationOrigin to)
@@ -241,7 +289,7 @@ namespace evf{
     if (to==edm::TerminationOrigin::ExceptionFromThisContext) context =  " FromThisContext ";
     if (to==edm::TerminationOrigin::ExceptionFromAnotherContext) context =  " FromAnotherContext";
     if (to==edm::TerminationOrigin::ExternalSignal) context = " FromExternalSignal";
-    edm::LogInfo("FastMonitoringService") << " SOURCE " << "earlyTermination -: " << context;
+    edm::LogWarning("FastMonitoringService") << " SOURCE " << "earlyTermination -: " << context;
     std::lock_guard<std::mutex> lock(fmt_.monlock_);
     exception_detected_=true; 
   }
@@ -264,17 +312,19 @@ namespace evf{
 
     //build a map of modules keyed by their module description address
     //here we need to treat output modules in a special way so they can be easily singled out
-    if(desc.moduleName() == "Stream" || desc.moduleName() == "ShmStreamConsumer" ||
-       desc.moduleName() == "EventStreamFileWriter" || desc.moduleName() == "PoolOutputModule")
+    if(desc.moduleName() == "Stream" || desc.moduleName() == "ShmStreamConsumer" || desc.moduleName() == "EvFOutputModule" ||
+       desc.moduleName() == "EventStreamFileWriter" || desc.moduleName() == "PoolOutputModule") {
       encModule_.updateReserved((void*)&desc);
+      nOutputModules_++;
+    }
     else
       encModule_.update((void*)&desc);
   }
 
   void FastMonitoringService::postBeginJob()
   {
-    std::string && moduleLegStr = makeModuleLegenda();
-    FileIO::writeStringToFile(moduleLegendFile_, moduleLegStr);
+    std::string && moduleLegStrJson = makeModuleLegendaJson();
+    FileIO::writeStringToFile(moduleLegendFileJson_, moduleLegStrJson);
 
     macrostate_ = FastMonitoringThread::sJobReady;
 
@@ -353,36 +403,36 @@ namespace evf{
 	  IntJ *lumiProcessedJptr = dynamic_cast<IntJ*>(fmt_.jsonMonitor_->getMergedIntJForLumi("Processed",lumi));
           if (!lumiProcessedJptr)
               throw cms::Exception("FastMonitoringService") << "Internal error: got null pointer from FastMonitor";
-	  processedEventsPerLumi_[lumi] = lumiProcessedJptr->value();
+	  processedEventsPerLumi_[lumi] = std::pair<unsigned int,bool>(lumiProcessedJptr->value(),false);
 
-	  {
-	    auto itr = sourceEventsReport_.find(lumi);
-	    if (itr==sourceEventsReport_.end()) {
-              //check if exception has been thrown (in case of Global/Stream early termination, for this LS)
-              bool exception_detected = exception_detected_;
-              for (auto ex : exceptionInLS_)
-                if (lumi == ex) exception_detected=true;
+          //checking if exception has been thrown (in case of Global/Stream early termination, for this LS)
+          bool exception_detected = exception_detected_;
+          for (auto ex : exceptionInLS_)
+            if (lumi == ex) exception_detected=true;
 
-              if (edm::shutdown_flag || exception_detected) {
-                edm::LogInfo("FastMonitoringService") << "Run interrupted. Skip writing EoL information -: "
-                                                      << processedEventsPerLumi_[lumi] << " events were processed in LUMI " << lumi;
-                //this will prevent output modules from producing json file for possibly incomplete lumi
-                processedEventsPerLumi_[lumi]=0;
-                return;
-              }
-              //disable this exception, so service can be used standalone (will be thrown if output module asks for this information)
-              //throw cms::Exception("FastMonitoringService") << "SOURCE did not send update for lumi block. LUMI -:" << lumi;
-	    }
-	    else {
-	      if (itr->second!=processedEventsPerLumi_[lumi]) {
-		throw cms::Exception("FastMonitoringService") << "MISMATCH with SOURCE update. LUMI -: "
+          if (edm::shutdown_flag || exception_detected) {
+            edm::LogInfo("FastMonitoringService") << "Run interrupted. Skip writing EoL information -: "
+                                                  << processedEventsPerLumi_[lumi].first << " events were processed in LUMI " << lumi;
+            //this will prevent output modules from producing json file for possibly incomplete lumi
+            processedEventsPerLumi_[lumi].first=0;
+            processedEventsPerLumi_[lumi].second=true;
+            //disable this exception, so service can be used standalone (will be thrown if output module asks for this information)
+            //throw cms::Exception("FastMonitoringService") << "SOURCE did not send update for lumi block. LUMI -:" << lumi;
+            return;
+
+          }
+
+          if (inputSource_) {
+            auto sourceReport  = inputSource_->getEventReport(lumi, true);
+	    if (sourceReport.first) {
+	      if (sourceReport.second!=processedEventsPerLumi_[lumi].first) {
+	        throw cms::Exception("FastMonitoringService") << "MISMATCH with SOURCE update. LUMI -: "
                                                               << lumi
-                                                              << ", events(processed):" << processedEventsPerLumi_[lumi]
-                                                              << " events(source):" << itr->second;
+                                                              << ", events(processed):" << processedEventsPerLumi_[lumi].first
+                                                              << " events(source):" << sourceReport.second;
 	      }
-	      sourceEventsReport_.erase(itr);
 	    }
-	  }
+          }
 	  edm::LogInfo("FastMonitoringService")	<< "Statistics for lumisection -: lumi = " << lumi << " events = "
 			                        << lumiProcessedJptr->value() << " time = " << usecondsForLumi/1000000
 			                        << " size = " << accuSize << " thr = " << throughput;
@@ -462,8 +512,8 @@ namespace evf{
 	collectedPathList_[sc.streamID()]->store(true,std::memory_order_seq_cst);
 	fmt_.m_data.ministateBins_=encPath_[sc.streamID()].vecsize();
 	if (!pathLegendWritten_) {
-	  std::string pathLegendStr =  makePathLegenda();
-	  FileIO::writeStringToFile(pathLegendFile_, pathLegendStr);
+	  std::string pathLegendStrJson =  makePathLegendaJson();
+	  FileIO::writeStringToFile(pathLegendFileJson_, pathLegendStrJson);
 	  pathLegendWritten_=true;
 	}
       }
@@ -597,12 +647,13 @@ namespace evf{
   }
 
   //for the output module
-  unsigned int FastMonitoringService::getEventsProcessedForLumi(unsigned int lumi) {
+  unsigned int FastMonitoringService::getEventsProcessedForLumi(unsigned int lumi, bool * abortFlag) {
     std::lock_guard<std::mutex> lock(fmt_.monlock_);
 
     auto it = processedEventsPerLumi_.find(lumi);
     if (it!=processedEventsPerLumi_.end()) {
-      unsigned int proc = it->second;
+      unsigned int proc = it->second.first;
+      if (abortFlag) *abortFlag=it->second.second;
       return proc;
     }
     else {
@@ -611,6 +662,20 @@ namespace evf{
     }
   }
 
+  //for the output module
+  bool FastMonitoringService::getAbortFlagForLumi(unsigned int lumi) {
+    std::lock_guard<std::mutex> lock(fmt_.monlock_);
+
+    auto it = processedEventsPerLumi_.find(lumi);
+    if (it!=processedEventsPerLumi_.end()) {
+      unsigned int abortFlag = it->second.second;
+      return abortFlag;
+    }
+    else {
+      throw cms::Exception("FastMonitoringService") << "output module wants already deleted (or never reported by SOURCE) lumisection status for LUMI -: "<<lumi;
+      return 0;
+    }
+  }
 
   void FastMonitoringService::doSnapshot(const unsigned int ls, const bool isGlobalEOL) {
     // update macrostate
@@ -658,16 +723,5 @@ namespace evf{
       fmt_.jsonMonitor_->snap(ls);
   }
 
-  void FastMonitoringService::reportEventsThisLumiInSource(unsigned int lumi,unsigned int events)
-  {
-
-    std::lock_guard<std::mutex> lock(fmt_.monlock_);
-    auto itr = sourceEventsReport_.find(lumi);
-    if (itr!=sourceEventsReport_.end())
-      itr->second+=events;
-    else 
-      sourceEventsReport_[lumi]=events;
-
-  }
 } //end namespace evf
 

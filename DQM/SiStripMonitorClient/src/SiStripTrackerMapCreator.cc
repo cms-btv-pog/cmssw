@@ -165,7 +165,7 @@ void SiStripTrackerMapCreator::createForOffline(const edm::ParameterSet & tkmapP
     topModules=false;
 
   if(tkmapPset.exists("numberTopModules"))
-      numTopModules=tkmapPset.getUntrackedParameter<int32_t>("numberTopModules");
+      numTopModules=tkmapPset.getUntrackedParameter<uint32_t>("numberTopModules");
   else
       numTopModules = 20;
   
@@ -410,19 +410,32 @@ void SiStripTrackerMapCreator::setTkMapFromHistogram(DQMStore* dqm_store, std::s
     dqm_store->cd(mechanicalview_dir);
   }
   dqm_store->cd();
-  if (topModules) printTopModules(topNmodVec, eSetup);
+  if (topModules) printTopModules(topNmodVec, eSetup, htype);
   delete topNmodVec;
 }
 
-void SiStripTrackerMapCreator::printTopModules(std::vector<std::pair<float,uint32_t> >* topNmodVec, const edm::EventSetup& eSetup){
+void SiStripTrackerMapCreator::printTopModules(std::vector<std::pair<float,uint32_t> >* topNmodVec, const edm::EventSetup& eSetup, std::string& htype){
 
    //////////////Retrieve tracker topology from geometry
+   //edm::ESHandle<TrackerTopology> tTopoHandle;
+   //eSetup.get<TrackerTopologyRecord>().get(tTopoHandle);
+   //const TrackerTopology* const tTopo = tTopoHandle.product();  
    edm::ESHandle<TrackerTopology> tTopoHandle;
-   eSetup.get<IdealGeometryRecord>().get(tTopoHandle);
-   const TrackerTopology* const tTopo = tTopoHandle.product();  
+   eSetup.get<TrackerTopologyRcd>().get(tTopoHandle);
+   const TrackerTopology* const tTopo = tTopoHandle.product();
 
-   std::sort(topNmodVec->rbegin(), topNmodVec->rend());
-   topNmodVec->resize(numTopModules);
+   if (topNmodVec->empty()) return;
+
+   if (htype == "StoNCorrOnTrack") {
+      topModLabel += " less than 10";
+      std::sort(topNmodVec->begin(), topNmodVec->end());
+      while ((topNmodVec->back()).first > 10)
+        topNmodVec->pop_back();
+   }
+   else{
+      std::sort(topNmodVec->rbegin(), topNmodVec->rend());
+      if (topNmodVec->size() > numTopModules) topNmodVec->resize(numTopModules);
+   }
    
    edm::LogVerbatim("TopModules") << topModLabel;
    edm::LogVerbatim("TopModules") << "------------------------------------------------------";
@@ -490,13 +503,12 @@ void SiStripTrackerMapCreator::paintTkMapFromHistogram(DQMStore* dqm_store, Moni
       if (fval == 0.0) trackerMap_->fillc(det_id,255, 255, 255);  
       else {
  	trackerMap_->fill_current_val(det_id, fval);
+        if(topNmodVec){
+         auto detPair = std::make_pair(fval,det_id);
+	 topNmodVec->push_back(detPair);
+	}
       }
       tkMapMax_ += fval;
-      if(topNmodVec){
-	//std::ostringstream ss; ss << fval;
-        auto detPair = std::make_pair(fval,det_id);
-        topNmodVec->push_back(detPair);
-      }
     }
   }
 } 

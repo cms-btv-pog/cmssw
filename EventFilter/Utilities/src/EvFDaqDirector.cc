@@ -2,13 +2,15 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/ServiceRegistry/interface/SystemBounds.h"
 #include "FWCore/ServiceRegistry/interface/GlobalContext.h"
+#include "FWCore/ServiceRegistry/interface/ProcessContext.h"
 #include "FWCore/Utilities/interface/StreamID.h"
-#include "FWCore/ParameterSet/interface/Registry.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
 
 #include "EventFilter/Utilities/interface/EvFDaqDirector.h"
 #include "EventFilter/Utilities/interface/FastMonitoringService.h"
-#include "EventFilter/Utilities/plugins/FedRawDataInputSource.h"
+#include "EventFilter/Utilities/interface/FedRawDataInputSource.h"
 #include "EventFilter/Utilities/interface/DataPointDefinition.h"
 #include "EventFilter/Utilities/interface/DataPoint.h"
 
@@ -22,6 +24,8 @@
 #include <boost/filesystem/fstream.hpp>
 
 //#define DEBUG
+
+using namespace jsoncollector;
 
 namespace evf {
 
@@ -38,25 +42,17 @@ namespace evf {
 
   EvFDaqDirector::EvFDaqDirector(const edm::ParameterSet &pset,
 				 edm::ActivityRegistry& reg) :
-    testModeNoBuilderUnit_(
-			   pset.getUntrackedParameter<bool> ("testModeNoBuilderUnit",
-							     false)
-			   ),
-    base_dir_(
-	      pset.getUntrackedParameter<std::string> ("baseDir", "/data")
-	      ),
-    bu_base_dir_(
-		 pset.getUntrackedParameter<std::string> ("buBaseDir", "/data")
-		 ),
-    directorBu_(
-		pset.getUntrackedParameter<bool> ("directorIsBu", false)
-		),
+    base_dir_(pset.getUntrackedParameter<std::string> ("baseDir", ".")),
+    bu_base_dir_(pset.getUntrackedParameter<std::string> ("buBaseDir", ".")),
+    directorBu_(pset.getUntrackedParameter<bool> ("directorIsBu", false)),
     run_(pset.getUntrackedParameter<unsigned int> ("runNumber",0)),
     outputAdler32Recheck_(pset.getUntrackedParameter<bool>("outputAdler32Recheck",false)),
     requireTSPSet_(pset.getUntrackedParameter<bool>("requireTransfersPSet",false)),
     selectedTransferMode_(pset.getUntrackedParameter<std::string>("selectedTransferMode","")),
     hltSourceDirectory_(pset.getUntrackedParameter<std::string>("hltSourceDirectory","")),
     fuLockPollInterval_(pset.getUntrackedParameter<unsigned int>("fuLockPollInterval",2000)),
+    emptyLumisectionMode_(pset.getUntrackedParameter<bool>("emptyLumisectionMode",false)),
+    microMergeDisabled_(pset.getUntrackedParameter<bool>("microMergeDisabled",false)),
     hostname_(""),
     bu_readlock_fd_(-1),
     bu_writelock_fd_(-1),
@@ -75,8 +71,6 @@ namespace evf {
     dirManager_(base_dir_),
 
     previousFileSize_(0),
-    jumpLS_(0),
-    jumpIndex_(0),
 
     bu_w_flk( make_flock( F_WRLCK, SEEK_SET, 0, 0, 0 )),
     bu_r_flk( make_flock( F_RDLCK, SEEK_SET, 0, 0, 0 )),
@@ -93,15 +87,11 @@ namespace evf {
   {
 
     reg.watchPreallocate(this, &EvFDaqDirector::preallocate);
+    reg.watchPreBeginJob(this, &EvFDaqDirector::preBeginJob);
     reg.watchPreGlobalBeginRun(this, &EvFDaqDirector::preBeginRun);
     reg.watchPostGlobalEndRun(this, &EvFDaqDirector::postEndRun);
     reg.watchPreSourceEvent(this, &EvFDaqDirector::preSourceEvent);
     reg.watchPreGlobalEndLumi(this,&EvFDaqDirector::preGlobalEndLumi);
-
-    std::stringstream ss;
-    ss << "run" << std::setfill('0') << std::setw(6) << run_;
-    run_string_ = ss.str();
-    run_dir_ = base_dir_+"/"+run_string_;
 
     //save hostname for later
     char hostname[33];
@@ -112,10 +102,32 @@ namespace evf {
     if (fuLockPollIntervalPtr) {
       try {
         fuLockPollInterval_=boost::lexical_cast<unsigned int>(std::string(fuLockPollIntervalPtr));
-        edm::LogInfo("Setting fu lock poll interval by environment string: ") << fuLockPollInterval_ << " us";
+        edm::LogInfo("EvFDaqDirector") << "Setting fu lock poll interval by environment string: " << fuLockPollInterval_ << " us";
       }
-      catch (...) {edm::LogWarning("Unable to parse environment string: ") << std::string(fuLockPollIntervalPtr);}
+      catch( boost::bad_lexical_cast const& ) {
+        edm::LogWarning("EvFDaqDirector") << "Bad lexical cast in parsing: " << std::string(fuLockPollIntervalPtr);
+      }
     }
+
+    char * emptyLumiModePtr = getenv("FFF_EMPTYLSMODE");
+    if (emptyLumiModePtr) {
+        emptyLumisectionMode_ = true;
+        edm::LogInfo("EvFDaqDirector") << "Setting empty lumisection mode";
+    }
+
+    char * microMergeDisabledPtr = getenv("FFF_MICROMERGEDISABLED");
+    if (microMergeDisabledPtr) {
+        microMergeDisabled_ = true;
+        edm::LogInfo("EvFDaqDirector") << "Disabling dat file micro-merge by the HLT process (delegated to the hlt daemon)";
+    }
+  }
+
+  void EvFDaqDirector::initRun()
+  {
+    std::stringstream ss;
+    ss << "run" << std::setfill('0') << std::setw(6) << run_;
+    run_string_ = ss.str();
+    run_dir_ = base_dir_+"/"+run_string_;
 
     // check if base dir exists or create it accordingly
     int retval = mkdir(base_dir_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
@@ -201,12 +213,12 @@ namespace evf {
 	    std::string hltdir=bu_run_dir_+"/hlt";
 	    std::string tmphltdir=bu_run_open_dir_+"/hlt";
 	    retval = mkdir(tmphltdir.c_str(),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	    if (retval != 0 && errno != EEXIST)
+	      throw cms::Exception("DaqDirector")
+	        << " Error creating bu run dir -: " << hltdir
+	        << " mkdir error:" << strerror(errno) << "\n";
 
             boost::filesystem::copy_file(hltSourceDirectory_+"/HltConfig.py",tmphltdir+"/HltConfig.py");
-            try {
-              boost::filesystem::copy_file(hltSourceDirectory_+"/CMSSW_VERSION",tmphltdir+"/CMSSW_VERSION");
-              boost::filesystem::copy_file(hltSourceDirectory_+"/SCRAM_ARCH",tmphltdir+"/SCRAM_ARCH");
-            } catch (...) {}
 
             boost::filesystem::copy_file(hltSourceDirectory_+"/fffParameters.jsn",tmphltdir+"/fffParameters.jsn");
 
@@ -251,24 +263,38 @@ namespace evf {
 
   }
 
-  void EvFDaqDirector::postEndRun(edm::GlobalContext const& globalContext) {
-    close(bu_readlock_fd_);
-    close(bu_writelock_fd_);
-    if (directorBu_) {
-      std::string filename = bu_run_dir_ + "/bu.lock";
-      removeFile(filename);
-    }
-  }
 
   void EvFDaqDirector::preallocate(edm::service::SystemBounds const& bounds) {
+
+    initRun();
 
     for (unsigned int i=0;i<bounds.maxNumberOfStreams();i++){
       streamFileTracker_.push_back(-1);
     }
     nThreads_=bounds.maxNumberOfStreams();
     nStreams_=bounds.maxNumberOfThreads();
+  }
 
-    checkTransferSystemPSet();
+  void EvFDaqDirector::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
+  {
+    edm::ParameterSetDescription desc;
+    desc.setComment("Service used for file locking arbitration and for propagating information between other EvF components");
+    desc.addUntracked<std::string> ("baseDir", ".")->setComment("Local base directory for run output");
+    desc.addUntracked<std::string> ("buBaseDir", ".")->setComment("BU base ramdisk directory ");
+    desc.addUntracked<unsigned int> ("runNumber",0)->setComment("Run Number in ramdisk to open");
+    desc.addUntracked<bool>("outputAdler32Recheck",false)->setComment("Check Adler32 of per-process output files while micro-merging");
+    desc.addUntracked<bool>("requireTransfersPSet",false)->setComment("Require complete transferSystem PSet in the process configuration");
+    desc.addUntracked<std::string>("selectedTransferMode","")->setComment("Selected transfer mode (choice in Lvl0 propagated as Python parameter");
+    desc.addUntracked<unsigned int>("fuLockPollInterval",2000)->setComment("Lock polling interval in microseconds for the input directory file lock");
+    desc.addUntracked<bool>("emptyLumisectionMode",false)->setComment("Enables writing stream output metadata even when no events are processed in a lumisection");
+    desc.addUntracked<bool>("microMergeDisabled",false)->setComment("Disabled micro-merging by the Output Module, so it is later done by hltd service");
+    desc.setAllowAnything();
+    descriptions.add("EvFDaqDirector", desc);
+  }
+
+  void EvFDaqDirector::preBeginJob(edm::PathsAndConsumesOfModulesBase const&,
+                                   edm::ProcessContext const& pc) {
+    checkTransferSystemPSet(pc);
   }
 
   void EvFDaqDirector::preBeginRun(edm::GlobalContext const& globalContext) {
@@ -280,6 +306,15 @@ namespace evf {
       edm::LogWarning("EvFDaqDirector") << "WARNING - checking run dir -: "
 					<< run_dir_ << ". This is not the highest run "
 					<< dirManager_.findHighestRunDir();
+    }
+  }
+
+  void EvFDaqDirector::postEndRun(edm::GlobalContext const& globalContext) {
+    close(bu_readlock_fd_);
+    close(bu_writelock_fd_);
+    if (directorBu_) {
+      std::string filename = bu_run_dir_ + "/bu.lock";
+      removeFile(filename);
     }
   }
 
@@ -309,7 +344,7 @@ namespace evf {
           try {
             boost::filesystem::remove(filePath);
           }
-            catch (...) {/*file gets deleted first time but exception is still thrown*/}
+            catch (const boost::filesystem::filesystem_error&) {/*file gets deleted first time but exception is still thrown*/}
         }
         catch (std::exception& ex)
         {
@@ -317,7 +352,7 @@ namespace evf {
           usleep(10000);
           try {
 	    boost::filesystem::remove(filePath);
-          } catch (...) {/*file gets deleted first time but exception is still thrown*/}
+          } catch (std::exception&) {/*file gets deleted first time but exception is still thrown*/}
         }
         
         delete it->second;
@@ -347,6 +382,10 @@ namespace evf {
 
   std::string EvFDaqDirector::getOpenInputJsonFilePath(const unsigned int ls, const unsigned int index) const {
     return bu_run_dir_ + "/open/" + fffnaming::inputJsonFileName(run_,ls,index);
+  }
+
+  std::string EvFDaqDirector::getDatFilePath(const unsigned int ls, std::string const& stream) const {
+    return run_dir_ + "/" + fffnaming::streamerDataFileNameWithPid(run_,ls,stream);
   }
 
   std::string EvFDaqDirector::getOpenDatFilePath(const unsigned int ls, std::string const& stream) const {
@@ -492,61 +531,82 @@ namespace evf {
 
     // if the stream is readable
     if (fu_rw_lock_stream != 0) {
-      unsigned int readLs, readIndex, jumpLs, jumpIndex;
+      unsigned int readLs, readIndex;
       int check = 0;
       // rewind the stream
       check = fseek(fu_rw_lock_stream, 0, SEEK_SET);
       // if rewinded ok
       if (check == 0) {
 	// read its' values
-	if (testModeNoBuilderUnit_)
-	  fscanf(fu_rw_lock_stream, "%u %u %u %u", &readLs, &readIndex,
-		 &jumpLs, &jumpIndex);
-	else {
-	  fscanf(fu_rw_lock_stream, "%u %u", &readLs, &readIndex);
-	  edm::LogInfo("EvFDaqDirector") << "Read fu.lock file file -: " << readLs << ":" << readIndex;
-        }
+	fscanf(fu_rw_lock_stream, "%u %u", &readLs, &readIndex);
+	edm::LogInfo("EvFDaqDirector") << "Read fu.lock file file -: " << readLs << ":" << readIndex;
 
-	// try to bump
-	bool bumpedOk = bumpFile(readLs, readIndex, nextFile, fsize, stopFileLS);
-	ls = readLs;
-	// there is a new file to grab or lumisection ended
+        unsigned int currentLs = readLs;
+        bool bumpedOk = false;
+        //if next lumisection in a lock file is not +1 wrt. source, cycle through the next empty one, unless initial lumi not yet set
+        //no lock file write in this case
+        if (ls && ls+1 < currentLs) ls++;
+        else {
+	  // try to bump (look for new index or EoLS file)
+	  bumpedOk = bumpFile(readLs, readIndex, nextFile, fsize, stopFileLS);
+          //avoid 2 lumisections jump
+          if (ls && readLs>currentLs && currentLs > ls) {
+            ls++;
+            readLs=currentLs=ls;
+            readIndex=0;
+            bumpedOk=false;
+            //no write to lock file
+          }
+          else {
+            if (ls==0 && readLs>currentLs) {
+              //make sure to intialize always with LS found in the lock file, with possibility of grabbing index file immediately
+              //in this case there is no new file in the same LS
+              readLs=currentLs;
+              readIndex=0;
+              bumpedOk=false;
+              //no write to lock file
+            }
+            //update return LS value
+	    ls = readLs;
+          }
+        }
 	if (bumpedOk) {
-	  // write new data
+	  // there is a new index file to grab, lock file needs to be updated
 	  check = fseek(fu_rw_lock_stream, 0, SEEK_SET);
 	  if (check == 0) {
 	    ftruncate(fu_readwritelock_fd_, 0);
 	    // write next index in the file, which is the file the next process should take
-	    if (testModeNoBuilderUnit_) {
-	      fprintf(fu_rw_lock_stream, "%u %u %u %u", readLs,
-		      readIndex + 1, readLs + 2, readIndex + 1);
-	      jumpLS_ = readLs + 2;
-	      jumpIndex_ = readIndex;
-	    } else {
-	      fprintf(fu_rw_lock_stream, "%u %u", readLs,
-		      readIndex + 1);
-	    }
-            fflush(fu_rw_lock_stream);
-            fsync(fu_readwritelock_fd_);
+	    fprintf(fu_rw_lock_stream, "%u %u", readLs, readIndex + 1);
+	    fflush(fu_rw_lock_stream);
+	    fsync(fu_readwritelock_fd_);
 	    fileStatus = newFile;
-
-	    if (testModeNoBuilderUnit_)
-	      edm::LogInfo("EvFDaqDirector") << "Written to file -: " << readLs << ":"
-			                     << readIndex + 1 << " --> " << readLs + 2
-			                     << ":" << readIndex + 1;
-	    else
-	      LogDebug("EvFDaqDirector") << "Written to file -: " << readLs << ":"
-			                     << readIndex + 1;
-
-	  } else
-	      throw cms::Exception("EvFDaqDirector") << "seek on fu read/write lock for updating failed with error "
-	                                             << strerror(errno);
+	    LogDebug("EvFDaqDirector") << "Written to file -: " << readLs << ":" << readIndex + 1;
+	  }
+          else {
+            throw cms::Exception("EvFDaqDirector") << "seek on fu read/write lock for updating failed with error " << strerror(errno);
+          }
 	}
-      } else
-	edm::LogError("EvFDaqDirector") << "seek on fu read/write lock for reading failed with error "
-					<< strerror(errno);
-    } else
+        else if (currentLs < readLs) {
+          //there is no new file in next LS (yet), but lock file can be updated to the next LS
+	  check = fseek(fu_rw_lock_stream, 0, SEEK_SET);
+	  if (check == 0) {
+	    ftruncate(fu_readwritelock_fd_, 0);
+	    // in this case LS was bumped, but no new file. Thus readIndex is 0 (set by bumpFile)
+	    fprintf(fu_rw_lock_stream, "%u %u", readLs, readIndex);
+	    fflush(fu_rw_lock_stream);
+	    fsync(fu_readwritelock_fd_);
+	    LogDebug("EvFDaqDirector") << "Written to file -: " << readLs << ":" << readIndex;
+	  }
+          else {
+            throw cms::Exception("EvFDaqDirector") << "seek on fu read/write lock for updating failed with error " << strerror(errno);
+          }
+        }
+      } else {
+	edm::LogError("EvFDaqDirector") << "seek on fu read/write lock for reading failed with error " << strerror(errno);
+      }
+    } else {
       edm::LogError("EvFDaqDirector") << "fu read/write lock stream is invalid " << strerror(errno);
+    }
 
 #ifdef DEBUG
     timeval ts_preunlock;
@@ -645,11 +705,7 @@ namespace evf {
 
     if (previousFileSize_ != 0) {
       if (!fms_) {
-        try {
           fms_ = (FastMonitoringService *) (edm::Service<evf::MicroStateService>().operator->());
-        } catch (...) {
-	        edm::LogError("EvFDaqDirector") <<" FastMonitoringService not found";
-        }
       }
       if (fms_) fms_->accumulateFileSize(ls, previousFileSize_);
       previousFileSize_ = 0;
@@ -675,7 +731,6 @@ namespace evf {
     else {
       std::string BUEoLSFile = getEoLSFilePathOnBU(ls);
       bool eolFound = (stat(BUEoLSFile.c_str(), &buf) == 0);
-      unsigned int startingLumi = ls;
       while (eolFound) {
 
         // recheck that no raw file appeared in the meantime
@@ -710,23 +765,12 @@ namespace evf {
 	  // a new file was found at new lumisection, index 0
 	  previousFileSize_ = buf.st_size;
           fsize = buf.st_size;
-
-	  if (testModeNoBuilderUnit_) {
-	    // rename ended lumi to + 2
-            std::string sourceEol = getEoLSFilePathOnBU(startingLumi);
-
-	    std::string destEol = getEoLSFilePathOnBU(startingLumi+2);
-
-	    std::string cpCmd = "cp " + sourceEol + " " + destEol;
-	    edm::LogInfo("EvFDaqDirector") << " testmode: Running copy cmd -: " << cpCmd;
-	    int rc = system(cpCmd.c_str());
-	    if (rc != 0) {
-	      edm::LogError("EvFDaqDirector") << " testmode: COPY EOL FAILED!!!!! -: " << cpCmd;
-	    }
-	  }
-
 	  return true;
 	}
+        else {
+          //change of policy: we need to cycle through each LS
+          return false;
+        }
         BUEoLSFile = getEoLSFilePathOnBU(ls);
         eolFound = (stat(BUEoLSFile.c_str(), &buf) == 0);
       }
@@ -741,12 +785,8 @@ namespace evf {
 				      << strerror(errno);
     else {
       edm::LogInfo("EvFDaqDirector") << "Initializing FU LOCK FILE";
-      unsigned int readLs = 1, readIndex = 0, jumpLs = 3, jumpIndex = 0;
-      if (testModeNoBuilderUnit_)
-	fprintf(fu_rw_lock_stream, "%u %u %u %u", readLs, readIndex,
-		jumpLs, jumpIndex);
-      else
-	fprintf(fu_rw_lock_stream, "%u %u", readLs, readIndex);
+      unsigned int readLs = 1, readIndex = 0;
+      fprintf(fu_rw_lock_stream, "%u %u", readLs, readIndex);
     }
   }
 
@@ -847,12 +887,15 @@ namespace evf {
   }
 
   //if transferSystem PSet is present in the menu, we require it to be complete and consistent for all specified streams
-  void EvFDaqDirector::checkTransferSystemPSet()
+  void EvFDaqDirector::checkTransferSystemPSet(edm::ProcessContext const& pc)
   {
+    if(transferSystemJson_) return;
+
     transferSystemJson_.reset(new Json::Value);
-    if (edm::getProcessParameterSet().existsAs<edm::ParameterSet>("transferSystem",true))
+    edm::ParameterSet const& topPset = edm::getParameterSet(pc.parameterSetID());
+    if (topPset.existsAs<edm::ParameterSet>("transferSystem",true))
     {
-      const edm::ParameterSet& tsPset(edm::getProcessParameterSet().getParameterSet("transferSystem"));
+      const edm::ParameterSet& tsPset(topPset.getParameterSet("transferSystem"));
 
       Json::Value destinationsVal(Json::arrayValue);
       std::vector<std::string> destinations = tsPset.getParameter<std::vector<std::string>>("destinations");
@@ -945,6 +988,12 @@ namespace evf {
       ret+=(*it).asString();
     }
     return ret;
+  }
+
+  void EvFDaqDirector::createProcessingNotificationMaybe() const {
+    std::string proc_flag = run_dir_ + "/processing";
+    int proc_flag_fd = open(proc_flag.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IWGRP | S_IRGRP | S_IWOTH | S_IROTH);
+    close(proc_flag_fd);
   }
 
 }

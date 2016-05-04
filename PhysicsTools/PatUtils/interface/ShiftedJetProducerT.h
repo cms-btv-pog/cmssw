@@ -29,7 +29,7 @@
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "PhysicsTools/PatUtils/interface/PATJetCorrExtractor.h"
-#include "PhysicsTools/PatUtils/interface/SmearedJetProducerT.h"
+#include "PhysicsTools/PatUtils/interface/RawJetExtractorT.h"
 
 #include <string>
 
@@ -57,13 +57,9 @@ template <typename T, typename Textractor>
 	jetCorrInputFileName_ = cfg.getParameter<edm::FileInPath>("jetCorrInputFileName");
 	if ( jetCorrInputFileName_.location() == edm::FileInPath::Unknown) throw cms::Exception("ShiftedJetProducerT")
 	  << " Failed to find JEC parameter file = " << jetCorrInputFileName_ << " !!\n";
-	std::cout << "Reading JEC parameters = " << jetCorrUncertaintyTag_
-		  << " from file = " << jetCorrInputFileName_.fullPath() << "." << std::endl;
 	jetCorrParameters_ = new JetCorrectorParameters(jetCorrInputFileName_.fullPath().data(), jetCorrUncertaintyTag_);
 	jecUncertainty_ = new JetCorrectionUncertainty(*jetCorrParameters_);
       } else {
-	std::cout << "Reading JEC parameters = " << jetCorrUncertaintyTag_
-		  << " from DB/SQLlite file." << std::endl;
 	jetCorrPayloadName_ = cfg.getParameter<std::string>("jetCorrPayloadName");
       }
     }
@@ -73,7 +69,7 @@ template <typename T, typename Textractor>
       jetCorrLabelUpToL3_ = cfg.getParameter<edm::InputTag>("jetCorrLabelUpToL3");
       jetCorrTokenUpToL3_ = mayConsume<reco::JetCorrector>(jetCorrLabelUpToL3_);
   }
-    if ( cfg.exists("jetCorrLabelUpToL3Res") ) {
+    if ( cfg.exists("jetCorrLabelUpToL3Res") && addResidualJES_ ) {
       jetCorrLabelUpToL3Res_ = cfg.getParameter<edm::InputTag>("jetCorrLabelUpToL3Res");
       jetCorrTokenUpToL3Res_ = mayConsume<reco::JetCorrector>(jetCorrLabelUpToL3Res_);
     }
@@ -108,8 +104,9 @@ template <typename T, typename Textractor>
     edm::Handle<reco::JetCorrector> jetCorrUpToL3;
     evt.getByToken(jetCorrTokenUpToL3_, jetCorrUpToL3);
     edm::Handle<reco::JetCorrector> jetCorrUpToL3Res;
-    evt.getByToken(jetCorrTokenUpToL3Res_, jetCorrUpToL3Res);
-
+    if ( evt.isRealData() && addResidualJES_ ) {
+      evt.getByToken(jetCorrTokenUpToL3Res_, jetCorrUpToL3Res);
+    }
     std::auto_ptr<JetCollection> shiftedJets(new JetCollection);
 
     if ( jetCorrPayloadName_ != "" ) {
@@ -141,7 +138,7 @@ template <typename T, typename Textractor>
       }
 
       if ( evt.isRealData() && addResidualJES_ ) {
-	const static SmearedJetProducer_namespace::RawJetExtractorT<T> rawJetExtractor;
+    const static pat::RawJetExtractorT<T> rawJetExtractor{};
 	reco::Candidate::LorentzVector rawJetP4 = rawJetExtractor(*originalJet);
 	if ( rawJetP4.E() > 1.e-1 ) {
 	  reco::Candidate::LorentzVector corrJetP4upToL3 =

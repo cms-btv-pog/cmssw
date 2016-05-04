@@ -14,18 +14,18 @@ def applySubstructure( process ) :
                                     distMax = cms.double(0.8)
     )
 
-    from PhysicsTools.PatAlgos.producersLayer1.jetProducer_cfi import patJets as patJetsDefault
+    from PhysicsTools.PatAlgos.producersLayer1.jetProducer_cfi import _patJets as patJetsDefault
 
     #add AK8
     addJetCollection(process, labelName = 'AK8',
                      jetSource = cms.InputTag('ak8PFJetsCHS'),
                      algo= 'AK', rParam = 0.8,
                      jetCorrections = ('AK8PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
-                     btagDiscriminators = [x.getModuleLabel() for x in patJetsDefault.discriminatorSources],
+                     btagDiscriminators = ([x.getModuleLabel() for x in patJetsDefault.discriminatorSources] + ['pfBoostedDoubleSecondaryVertexAK8BJetTags']),
                      genJetCollection = cms.InputTag('slimmedGenJetsAK8')
                      )
     process.patJetsAK8.userData.userFloats.src = [] # start with empty list of user floats
-    process.selectedPatJetsAK8.cut = cms.string("pt > 200")
+    process.selectedPatJetsAK8.cut = cms.string("pt > 170")
 
 
 
@@ -77,7 +77,7 @@ def applySubstructure( process ) :
         fatJets=cms.InputTag('ak8PFJetsCHS'),             # needed for subjet flavor clustering
         groomedFatJets=cms.InputTag('ak8PFJetsCHSSoftDrop') # needed for subjet flavor clustering
     )
-    process.selectedPatJetsAK8PFCHSSoftDrop.cut = cms.string("pt > 200")
+    process.selectedPatJetsAK8PFCHSSoftDrop.cut = cms.string("pt > 170")
     
     process.slimmedJetsAK8PFCHSSoftDropSubjets = cms.EDProducer("PATJetSlimmer",
         src = cms.InputTag("selectedPatJetsAK8PFCHSSoftDropSubjets"),

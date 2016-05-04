@@ -26,7 +26,7 @@ class BarrelDetLayer;
 class ForwardDetLayer;
 class MeasurementTrackerEvent;
 
-class RectangularEtaPhiTrackingRegion GCC11_FINAL : public TrackingRegion {
+class RectangularEtaPhiTrackingRegion final : public TrackingRegion {
 public:
   enum class UseMeasurementTracker {
     kNever = -1,
@@ -45,6 +45,8 @@ public:
     if(value > -0.5) return UseMeasurementTracker::kForSiStrips;
     return UseMeasurementTracker::kNever;
   }
+
+  static UseMeasurementTracker stringToUseMeasurementTracker(const std::string& name);
 
   RectangularEtaPhiTrackingRegion(RectangularEtaPhiTrackingRegion const & rh) :
     TrackingRegion(rh),
@@ -179,8 +181,8 @@ private:
       const TrackingRecHit*  outerHit,
       const edm::EventSetup& iSetup) const;
 
-  OuterEstimator * estimator(const BarrelDetLayer* layer,const edm::EventSetup& iSetup) const dso_internal;
-  OuterEstimator * estimator(const ForwardDetLayer* layer,const edm::EventSetup& iSetup) const dso_internal;
+  std::unique_ptr<OuterEstimator> estimator(const BarrelDetLayer* layer,const edm::EventSetup& iSetup) const dso_internal;
+  std::unique_ptr<OuterEstimator> estimator(const ForwardDetLayer* layer,const edm::EventSetup& iSetup) const dso_internal;
 
   OuterHitPhiPrediction phiWindow(const edm::EventSetup& iSetup) const dso_internal;
   HitRZConstraint rzConstraint() const dso_internal;

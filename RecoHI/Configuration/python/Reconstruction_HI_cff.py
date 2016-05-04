@@ -9,6 +9,9 @@ from RecoHI.HiTracking.HiTracking_cff import *    # two additional steps
 # Egamma
 from RecoHI.HiEgammaAlgos.HiEgamma_cff import *
 from RecoHI.HiEgammaAlgos.HiElectronSequence_cff import *
+ecalDrivenElectronSeeds.SeedConfiguration.SCEtCut = cms.double(15.0)
+ecalDrivenGsfElectrons.minSCEtBarrel = cms.double(15.0)
+ecalDrivenGsfElectrons.minSCEtEndcaps = cms.double(15.0)
 
 # Jet Reconstruction
 from RecoHI.HiJetAlgos.HiRecoJets_cff import *
@@ -22,6 +25,7 @@ from RecoHI.Configuration.Reconstruction_hiPF_cff import *
 
 # Heavy Ion Event Characterization
 from RecoHI.HiCentralityAlgos.HiCentrality_cfi import *
+from RecoHI.HiCentralityAlgos.CentralityBin_cfi import *
 from RecoHI.HiCentralityAlgos.HiClusterCompatibility_cfi import *
 from RecoHI.HiEvtPlaneAlgos.HiEvtPlane_cfi import *
 
@@ -30,7 +34,7 @@ from RecoMET.METProducers.hcalnoiseinfoproducer_cfi import *
 hcalnoise.trackCollName = 'hiGeneralTracks'
 
 # Global + High-Level Reco Sequence
-globalRecoPbPb = cms.Sequence(hiTracking
+globalRecoPbPb = cms.Sequence(hiTracking_wSplitting
                               * hiParticleFlowLocalReco
                               * hiEcalClusters
                               * hiRecoJets
@@ -39,9 +43,11 @@ globalRecoPbPb = cms.Sequence(hiTracking
                               * hiEgammaSequence
                               * hiParticleFlowReco
                               * hiCentrality
+                              * centralityBin
                               * hiClusterCompatibility
                               * hiEvtPlane
                               * hcalnoise
+                              * muonRecoHighLevelPbPb
                               )
 
 globalRecoPbPb_wConformalPixel = cms.Sequence(hiTracking_wConformalPixel
@@ -53,9 +59,11 @@ globalRecoPbPb_wConformalPixel = cms.Sequence(hiTracking_wConformalPixel
                                               * hiEgammaSequence
                                               * hiParticleFlowReco
                                               * hiCentrality
+                                              * centralityBin
                                               * hiClusterCompatibility
                                               * hiEvtPlane
                                               * hcalnoise
+                                              * muonRecoHighLevelPbPb
                                               )
 
 #--------------------------------------------------------------------------

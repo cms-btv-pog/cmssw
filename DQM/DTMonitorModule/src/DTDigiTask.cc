@@ -77,7 +77,7 @@ DTDigiTask::DTDigiTask(const edm::ParameterSet& ps){
   inTimeHitsLowerBound = ps.getParameter<int>("inTimeHitsLowerBound");
   inTimeHitsUpperBound = ps.getParameter<int>("inTimeHitsUpperBound");
   timeBoxGranularity = ps.getUntrackedParameter<int>("timeBoxGranularity",4);
-  maxTDCCounts = ps.getUntrackedParameter<int>("maxTDCCounts", 6400);
+  maxTTMounts = ps.getUntrackedParameter<int>("maxTTMounts", 6400);
 
   doAllHitsOccupancies = ps.getUntrackedParameter<bool>("doAllHitsOccupancies", true);
   doNoiseOccupancies = ps.getUntrackedParameter<bool>("doNoiseOccupancies", false);
@@ -139,7 +139,8 @@ void DTDigiTask::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & ru
     ibooker.setCurrentFolder(topFolder());
     for(int wh = -2; wh <= 2; ++wh) { // loop over wheels
       if(doAllHitsOccupancies) bookHistos(ibooker, wh,string("Occupancies"),"OccupancyAllHits");
-      if(doNoiseOccupancies) bookHistos(ibooker, wh,string("Occupancies"),"OccupancyNoiseHits");
+
+      if(doNoiseOccupancies) bookHistos(ibooker, wh,string("Occupancies"),"OccupancyNoise");
       if(doInTimeOccupancies) bookHistos(ibooker, wh,string("Occupancies"),"OccupancyInTimeHits");
 
       if(lookForSyncNoise || filterSyncNoise) {
@@ -265,13 +266,13 @@ void DTDigiTask::bookHistos(DQMStore::IBooker & ibooker, const DTSuperLayerId& d
 
     if (!readTTrigDB) {
       (digiHistos[histoTag])[dtSL.rawId()] =
-        ibooker.book1D(histoName,histoTitle, maxTDCCounts/timeBoxGranularity, 0, maxTDCCounts);
+        ibooker.book1D(histoName,histoTitle, maxTTMounts/timeBoxGranularity, 0, maxTTMounts);
       if(doLayerTimeBoxes) {      // Book TimeBoxes per layer
         for(int layer = 1; layer != 5; ++layer) {
           DTLayerId layerId(dtSL, layer);
           stringstream layerHistoName; layerHistoName << histoName << "_L" << layer;
           (digiHistos[histoTag])[layerId.rawId()] =
-            ibooker.book1D(layerHistoName.str(),layerHistoName.str(), maxTDCCounts/timeBoxGranularity, 0, maxTDCCounts);
+            ibooker.book1D(layerHistoName.str(),layerHistoName.str(), maxTTMounts/timeBoxGranularity, 0, maxTTMounts);
         }
       }
     }
@@ -666,12 +667,12 @@ void DTDigiTask::analyze(const edm::Event& event, const edm::EventSetup& c) {
                 (layer_number+(superlayer_number-1)*4)-1);
 
             // Fill the chamber occupancy
+
             histoTag = "OccupancyNoise";
             map<int, MonitorElement*>::const_iterator histoPerWheel =
               wheelHistos[histoTag].find(dtChId.wheel());
 
             histoPerWheel->second->Fill(dtChId.sector(),dtChId.station()); // FIXME: normalize to # of layers
-
           }
         }
 

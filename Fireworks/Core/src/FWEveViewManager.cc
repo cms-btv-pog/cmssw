@@ -16,14 +16,7 @@
 
 
 // user include files
-
-// For optimized redraw of Eve views
-#define protected public
-#define private   public
 #include "TEveManager.h"
-#undef private
-#undef protected
-
 #include "TEveSelection.h"
 #include "TEveScene.h"
 #include "TEveViewer.h"
@@ -642,7 +635,7 @@ FWEveViewManager::eventBegin()
 {
    // Prevent registration of redraw timer, full redraw is done in
    // FWEveViewManager::eventEnd().
-   gEve->fTimerActive = kTRUE;
+   gEve->EnforceTimerActive(kTRUE);
    gEve->DisableRedraw();
 
    context().resetMaxEtAndEnergy();
@@ -672,7 +665,7 @@ FWEveViewManager::eventEnd()
    {
       TEveElement::List_t scenes;
       Long64_t   key, value;
-      TExMapIter stamped_elements(gEve->fStampedElements);
+      TExMapIter stamped_elements(gEve->PtrToStampedElements());
       while (stamped_elements.Next(key, value))
       {
          TEveElement *el = reinterpret_cast<TEveElement*>(key);
@@ -685,7 +678,7 @@ FWEveViewManager::eventEnd()
    }
 
    // Process changes in scenes.
-   gEve->fScenes->ProcessSceneChanges(gEve->fDropLogicals, gEve->fStampedElements);
+   gEve->GetScenes()->ProcessSceneChanges(kFALSE, gEve->PtrToStampedElements());
 
    // To synchronize buffer swapping set swap_on_render to false.
    // Note that this costs 25-40% extra time with 4 views, depending on V-sync settings.
@@ -709,11 +702,11 @@ FWEveViewManager::eventEnd()
       }
    }
 
-   gEve->fViewers->RepaintChangedViewers(gEve->fResetCameras, gEve->fDropLogicals);
+   gEve->GetViewers()->RepaintChangedViewers(kFALSE, kFALSE);
 
    {
       Long64_t   key, value;
-      TExMapIter stamped_elements(gEve->fStampedElements);
+      TExMapIter stamped_elements(gEve->PtrToStampedElements());
       while (stamped_elements.Next(key, value))
       {
          TEveElement *el = reinterpret_cast<TEveElement*>(key);
@@ -724,15 +717,12 @@ FWEveViewManager::eventEnd()
          el->ClearStamps();
       }
    }
-   gEve->fStampedElements->Delete();
+   gEve->PtrToStampedElements()->Delete();
 
    gEve->GetListTree()->ClearViewPort(); // Fix this when several list-trees can be added.
 
-   gEve->fResetCameras = kFALSE;
-   gEve->fDropLogicals = kFALSE;
-
    gEve->EnableRedraw();
-   gEve->fTimerActive = kFALSE;
+   gEve->EnforceTimerActive(kFALSE);
 }
 
 //______________________________________________________________________________
@@ -797,6 +787,12 @@ FWEveViewManager::supportedTypesAndRepresentations() const
       for (size_t bii = 0, bie = blist.size(); bii != bie; ++bii)
       {
          BuilderInfo &info = blist[bii];
+         
+         if (context().getHidePFBuilders()) {
+            const static std::string pfExt = "PF ";
+            if (std::string::npos != info.m_name.find(pfExt))
+               continue;
+               }
 
          unsigned int bitPackedViews = info.m_viewBit;
          bool representsSubPart = (info.m_name.substr(info.m_name.find_first_of('@')-1, 1)=="!");
@@ -806,7 +802,7 @@ FWEveViewManager::supportedTypesAndRepresentations() const
          std::string name;
          bool isSimple;
          info.classType(name, isSimple);
-         if(isSimple)
+         if(isSimple) 
          {
             returnValue.add(boost::shared_ptr<FWRepresentationCheckerBase>(new FWSimpleRepresentationChecker(name, it->first,bitPackedViews,representsSubPart, FFOnly)) );
          }

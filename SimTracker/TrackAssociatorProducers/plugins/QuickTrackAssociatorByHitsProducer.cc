@@ -55,7 +55,7 @@ class QuickTrackAssociatorByHitsProducer : public edm::global::EDProducer<> {
       
       // ----------member data ---------------------------
   TrackerHitAssociator::Config trackerHitAssociatorConfig_;
-  edm::EDGetTokenT<ClusterTPAssociationList> cluster2TPToken_;
+  edm::EDGetTokenT<ClusterTPAssociation> cluster2TPToken_;
   double qualitySimToReco_;
   double puritySimToReco_;
   double cutRecoToSim_;
@@ -119,7 +119,7 @@ QuickTrackAssociatorByHitsProducer::QuickTrackAssociatorByHitsProducer(const edm
   produces<reco::TrackToTrackingParticleAssociator>();  
 
   if(useClusterTPAssociation_) {
-    cluster2TPToken_ = consumes<ClusterTPAssociationList>(iConfig.getParameter < edm::InputTag > ("cluster2TPSrc"));
+    cluster2TPToken_ = consumes<ClusterTPAssociation>(iConfig.getParameter < edm::InputTag > ("cluster2TPSrc"));
   }
 
 }
@@ -148,6 +148,10 @@ QuickTrackAssociatorByHitsProducer::makeHitAssociatorParameters(const edm::Param
   // I only want to use the hit associator methods that work on the hit IDs (i.e. the uint32_t trackId
   // and the EncodedEventId eventId) so I'm not interested in matching that to the PSimHit objects.
   hitAssociatorParameters.addParameter<bool>("associateRecoTracks",true);
+  // add these new ones to allow redirection of inputs:
+  hitAssociatorParameters.addParameter<edm::InputTag>( "pixelSimLinkSrc", iConfig.getParameter<edm::InputTag>("pixelSimLinkSrc") );
+  hitAssociatorParameters.addParameter<edm::InputTag>( "stripSimLinkSrc", iConfig.getParameter<edm::InputTag>("stripSimLinkSrc") );
+
   return hitAssociatorParameters;
 }
 
@@ -157,16 +161,16 @@ QuickTrackAssociatorByHitsProducer::produce(edm::StreamID, edm::Event& iEvent, c
 {
    using namespace edm;
 
-   const ClusterTPAssociationList *clusterAssoc = nullptr;
+   const ClusterTPAssociation *clusterAssoc = nullptr;
    std::unique_ptr<TrackerHitAssociator> trackAssoc;
    if(useClusterTPAssociation_)  {
-     edm::Handle<ClusterTPAssociationList> clusterAssocHandle;
+     edm::Handle<ClusterTPAssociation> clusterAssocHandle;
      iEvent.getByToken(cluster2TPToken_,clusterAssocHandle);
 
      if(clusterAssocHandle.isValid()) {
        clusterAssoc = clusterAssocHandle.product();
      } else {
-       edm::LogInfo( "TrackAssociator" ) << "ClusterTPAssociationList not found. Using DigiSimLink based associator";
+       edm::LogInfo( "TrackAssociator" ) << "ClusterTPAssociation not found. Using DigiSimLink based associator";
      }
    }
    if(not clusterAssoc) {

@@ -37,6 +37,8 @@ public:
     PuppiContainer(const edm::ParameterSet &iConfig);
     ~PuppiContainer(); 
     void initialize(const std::vector<RecoObj> &iRecoObjects);
+    void setNPV(int iNPV){ fNPV = iNPV; }
+
     std::vector<fastjet::PseudoJet> const & pfParticles() const { return fPFParticles; }    
     std::vector<fastjet::PseudoJet> const & pvParticles() const { return fChargedPV; }        
     std::vector<double> const & puppiWeights();
@@ -50,13 +52,14 @@ public:
     std::vector<fastjet::PseudoJet> const & puppiParticles() const { return fPupParticles;}
 
 protected:
-    double  goodVar      (fastjet::PseudoJet const &iPart,std::vector<fastjet::PseudoJet> const &iParts, int iOpt,double iRCone);
+    double  goodVar      (fastjet::PseudoJet const &iPart,std::vector<fastjet::PseudoJet> const &iParts, int iOpt,const double iRCone);
     void    getRMSAvg    (int iOpt,std::vector<fastjet::PseudoJet> const &iConstits,std::vector<fastjet::PseudoJet> const &iParticles,std::vector<fastjet::PseudoJet> const &iChargeParticles);
     void    getRawAlphas    (int iOpt,std::vector<fastjet::PseudoJet> const &iConstits,std::vector<fastjet::PseudoJet> const &iParticles,std::vector<fastjet::PseudoJet> const &iChargeParticles);
     double  getChi2FromdZ(double iDZ);
     int     getPuppiId   ( float iPt, float iEta);
-    double  var_within_R (int iId, const std::vector<fastjet::PseudoJet> & particles, const fastjet::PseudoJet& centre, double R);  
+    double  var_within_R (int iId, const std::vector<fastjet::PseudoJet> & particles, const fastjet::PseudoJet& centre, const double R);  
     
+    bool      fPuppiDiagnostics;
     std::vector<RecoObj>   fRecoParticles;
     std::vector<fastjet::PseudoJet> fPFParticles;
     std::vector<fastjet::PseudoJet> fChargedPV;
@@ -68,6 +71,7 @@ protected:
     std::vector<double>    fAlphaRMS;
 
     bool   fApplyCHS;
+    bool   fInvert;
     bool   fUseExp;
     double fNeutralMinPt;
     double fNeutralSlope;

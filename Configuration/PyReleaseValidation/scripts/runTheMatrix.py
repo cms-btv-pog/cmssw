@@ -23,7 +23,7 @@ def runSelected(opt):
 
     ret = 0
     if opt.show:
-        mrd.show(opt.testList,opt.extended)
+        mrd.show(opt.testList, opt.extended, opt.cafVeto)
         if opt.testList : print 'testListected items:', opt.testList
     else:
         mRunnerHi = MatrixRunner(mrd.workFlows, opt.nProcs, opt.nThreads)
@@ -53,7 +53,7 @@ if __name__ == '__main__':
                      4.22, #cosmic data
                      1000, #data+prompt
                      1001, #data+express
-                     4.53, #2012B Photon data
+                     134.911, #2015D Photon data
                      140.53, #2011 HI data
                      1330, #Run2 MC Zmm
                      135.4 #Run 2 Zee ttbar

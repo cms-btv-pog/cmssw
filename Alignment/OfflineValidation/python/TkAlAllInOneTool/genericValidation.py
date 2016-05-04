@@ -59,13 +59,12 @@ class GenericValidation:
             self.scramarch = os.environ["SCRAM_ARCH"]
             self.cmsswreleasebase = os.environ["CMSSW_RELEASE_BASE"]
         else:
-            self.scramarch = None
-            self.cmsswreleasebase = None
             command = ("cd '" + self.cmssw + "' && eval `scramv1 ru -sh 2> /dev/null`"
-                       ' && echo "$SCRAM_ARCH\n$CMSSW_RELEASE_BASE"')
+                       ' && echo "$CMSSW_BASE\n$SCRAM_ARCH\n$CMSSW_RELEASE_BASE"')
             commandoutput = getCommandOutput2(command).split('\n')
-            self.scramarch = commandoutput[0]
-            self.cmsswreleasebase = commandoutput[1]
+            self.cmssw = commandoutput[0]
+            self.scramarch = commandoutput[1]
+            self.cmsswreleasebase = commandoutput[2]
 
         self.AutoAlternates = True
         if config.has_option("alternateTemplates","AutoAlternates"):
@@ -172,7 +171,7 @@ class GenericValidation:
                                                          path, repMap = repMap, repMaps = repMaps)
         for script in self.scriptFiles:
             for scriptwithindex in addIndex(script, self.NJobs):
-                os.chmod(scriptwithindex,0755)
+                os.chmod(scriptwithindex,0o755)
         return self.scriptFiles
 
     def createCrabCfg(self, fileContents, path ):
@@ -252,7 +251,7 @@ class GenericValidationData(GenericValidation):
 
         self.dataset = globalDictionaries.usedDatasets[self.general["dataset"]][self.cmssw][tryPredefinedFirst]
         self.general["magneticField"] = self.dataset.magneticField()
-        self.general["defaultMagneticField"] = "38T"
+        self.general["defaultMagneticField"] = "MagneticField"
         if self.general["magneticField"] == "unknown":
             print "Could not get the magnetic field for this dataset."
             print "Using the default: ", self.general["defaultMagneticField"]
@@ -267,7 +266,7 @@ class GenericValidationData(GenericValidation):
                     begin = self.general["begin"],
                     end = self.general["end"],
                     parent = self.needParentFiles )
-            except AllInOneError, e:
+            except AllInOneError as e:
                 msg = "In section [%s:%s]: "%(valType, self.name)
                 msg += str(e)
                 raise AllInOneError(msg)
@@ -279,7 +278,7 @@ class GenericValidationData(GenericValidation):
             try:
                 theUpdate = config.getResultingSection(valType+":"+self.name,
                                                        demandPars = ["parallelJobs"])
-            except AllInOneError, e:
+            except AllInOneError as e:
                 msg = str(e)[:-1]+" when using 'jobmode: crab'."
                 raise AllInOneError(msg)
             self.general.update(theUpdate)
@@ -323,7 +322,7 @@ class GenericValidationData(GenericValidation):
                     begin = self.general["begin"],
                     end = self.general["end"],
                     crab = True )
-            except AllInOneError, e:
+            except AllInOneError as e:
                 msg = "In section [%s:%s]: "%(valType, self.name)
                 msg += str( e )
                 raise AllInOneError( msg )

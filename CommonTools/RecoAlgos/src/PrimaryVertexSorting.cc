@@ -21,33 +21,37 @@ float PrimaryVertexSorting::score(const reco::Vertex & pv,const  std::vector<con
   LorentzVector met;
   std::vector<fastjet::PseudoJet> fjInputs_;  
   fjInputs_.clear();
+  size_t countScale0 = 0;
   for (size_t i = 0 ; i < cands.size(); i++) {
     const reco::Candidate * c= cands[i];
+    float scale=1.;
+    if(c->bestTrack() != 0)
+      {
+        scale=(c->pt()-c->bestTrack()->ptError())/c->pt();
+        if(scale<0){ 
+	  scale=0; 
+	  countScale0++;
+	}
+      }
+
     int absId=abs(c->pdgId());
     if(absId==13 or absId == 11) {
-      float pt =c->pt();
-      float ptErr = (c->bestTrack() != 0)?c->bestTrack()->ptError() :0;
-      if(pt > ptErr) pt-=ptErr; else pt=0;
+      float pt =c->pt()*scale;
       sumPt2+=pt*pt;
-      met+=c->p4();
-      sumEt+=c->pt();
+      met+=c->p4()*scale;
+      sumEt+=c->pt()*scale;
     } else {
-      fjInputs_.push_back(fastjet::PseudoJet(c->px(),c->py(),c->pz(),c->p4().E()));
-      fjInputs_.back().set_user_index(i);
+      if (scale != 0){ // otherwise, what is the point to cluster zeroes
+	fjInputs_.push_back(fastjet::PseudoJet(c->px()*scale,c->py()*scale,c->pz()*scale,c->p4().E()*scale));
+	//      fjInputs_.back().set_user_index(i);
+      }
     }
   }
   fastjet::ClusterSequence sequence( fjInputs_, JetDefinition(antikt_algorithm, 0.4));
   auto jets = fastjet::sorted_by_pt(sequence.inclusive_jets(0));
   for (const auto & pj : jets) {
-    float sumPtErr2=0;
-    std::vector<fastjet::PseudoJet> constituents = pj.constituents();
-    for (unsigned j = 0; j < constituents.size(); j++) {
-	const reco::Candidate * c = cands[constituents[j].user_index()];
-        float ptErr = (c->bestTrack() != 0)?c->bestTrack()->ptError() :0;
-	sumPtErr2+=ptErr*ptErr;
-    }
     auto p4 = LorentzVector( pj.px(), pj.py(), pj.pz(), pj.e() ) ;
-    if(p4.pt()*p4.pt() > sumPtErr2) sumPt2+=(p4.pt()*p4.pt()-sumPtErr2)*0.8*0.8;
+    sumPt2+=(p4.pt()*p4.pt())*0.8*0.8;
     met+=p4;
     sumEt+=p4.pt();
   }
@@ -55,6 +59,7 @@ float PrimaryVertexSorting::score(const reco::Vertex & pv,const  std::vector<con
   if(metAbove > 0 and useMet) {
     sumPt2+=metAbove*metAbove;
   }
+  if (countScale0 == cands.size()) sumPt2 = countScale0*0.01; //leave some epsilon value to sort vertices with unknown pt
   return sumPt2;
 }
 

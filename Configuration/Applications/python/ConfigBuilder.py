@@ -8,6 +8,7 @@ from FWCore.ParameterSet.Modules import _Module
 import sys
 import re
 import collections
+from subprocess import Popen,PIPE
 import FWCore.ParameterSet.DictTypes as DictTypes
 class Options:
         pass
@@ -20,11 +21,11 @@ defaultOptions.isData=True
 defaultOptions.step=''
 defaultOptions.pileup='NoPileUp'
 defaultOptions.pileup_input = None
+defaultOptions.pileup_dasoption = ''
 defaultOptions.geometry = 'SimDB'
 defaultOptions.geometryExtendedOptions = ['ExtendedGFlash','Extended','NoCastor']
 defaultOptions.magField = ''
 defaultOptions.conditions = None
-defaultOptions.useCondDBv1 = False
 defaultOptions.scenarioOptions=['pp','cosmics','nocoll','HeavyIons']
 defaultOptions.harvesting= 'AtRunEnd'
 defaultOptions.gflash = False
@@ -35,6 +36,7 @@ defaultOptions.name = "NO NAME GIVEN"
 defaultOptions.evt_type = ""
 defaultOptions.filein = ""
 defaultOptions.dasquery=""
+defaultOptions.dasoption=""
 defaultOptions.secondfilein = ""
 defaultOptions.customisation_file = []
 defaultOptions.customisation_file_unsch = []
@@ -121,13 +123,28 @@ def filesFromList(fileName,s=None):
 		print "found parent files:",sec
 	return (prim,sec)
 	
-def filesFromDASQuery(query,s=None):
-	import os
+def filesFromDASQuery(query,option="",s=None):
+	import os,time
 	import FWCore.ParameterSet.Config as cms
 	prim=[]
 	sec=[]
 	print "the query is",query
-	for line in os.popen('das_client.py --query "%s"'%(query)):
+	eC=5
+	count=0
+	while eC!=0 and count<3:
+		if count!=0:
+			print 'Sleeping, then retrying DAS'
+			time.sleep(100)
+		p = Popen('das_client.py %s --query "%s"'%(option,query), stdout=PIPE,shell=True)
+                pipe=p.stdout.read()
+		tupleP = os.waitpid(p.pid, 0)
+		eC=tupleP[1]
+		count=count+1
+	if eC==0:
+		print "DAS succeeded after",count,"attempts",eC
+	else:
+		print "DAS failed 3 times- I give up"
+	for line in pipe.split('\n'):
 		if line.count(".root")>=2:
 			#two files solution...
 			entries=line.replace("\n","").split()
@@ -367,7 +384,7 @@ class ConfigBuilder(object):
 			if entry.startswith("filelist:"):
 				filesFromList(entry[9:],self.process.source)
 			elif entry.startswith("dbs:") or entry.startswith("das:"):
-				filesFromDASQuery('file dataset = %s'%(entry[4:]),self.process.source)
+				filesFromDASQuery('file dataset = %s'%(entry[4:]),self._options.dasoption,self.process.source)
 			else:
 				self.process.source.fileNames.append(self._options.dirin+entry)
 		if self._options.secondfilein:
@@ -378,7 +395,7 @@ class ConfigBuilder(object):
 				if entry.startswith("filelist:"):
 					self.process.source.secondaryFileNames.extend((filesFromList(entry[9:]))[0])
 				elif entry.startswith("dbs:") or entry.startswith("das:"):
-					self.process.source.secondaryFileNames.extend((filesFromDASQuery('file dataset = %s'%(entry[4:])))[0])
+					self.process.source.secondaryFileNames.extend((filesFromDASQuery('file dataset = %s'%(entry[4:]),self._options.dasoption))[0])
 				else:
 					self.process.source.secondaryFileNames.append(self._options.dirin+entry)
 
@@ -425,7 +442,7 @@ class ConfigBuilder(object):
 
 	if self._options.dasquery!='':
                self.process.source=cms.Source("PoolSource", fileNames = cms.untracked.vstring(),secondaryFileNames = cms.untracked.vstring())
-	       filesFromDASQuery(self._options.dasquery,self.process.source)
+	       filesFromDASQuery(self._options.dasquery,self._options.dasoption,self.process.source)
 
 	##drop LHEXMLStringProduct on input to save memory if appropriate
 	if 'GEN' in self.stepMap.keys():
@@ -525,9 +542,12 @@ class ConfigBuilder(object):
 				theEventContent = cms.PSet(outputCommands = cms.untracked.vstring('keep *'))
 			else:
 				theEventContent = getattr(self.process, theStreamType+"EventContent")
-				
+
+
+			addAlCaSelects=False
 			if theStreamType=='ALCARECO' and not theFilterName:
 				theFilterName='StreamALCACombined'
+				addAlCaSelects=True
 
 			CppType='PoolOutputModule'
 			if self._options.timeoutOutput:
@@ -546,6 +566,13 @@ class ConfigBuilder(object):
 				output.SelectEvents = cms.untracked.PSet(SelectEvents = cms.vstring('filtering_step'))				
 			if theSelectEvent:
 				output.SelectEvents =cms.untracked.PSet(SelectEvents = cms.vstring(theSelectEvent))
+
+			if addAlCaSelects:
+				if not hasattr(output,'SelectEvents'):
+					output.SelectEvents=cms.untracked.PSet(SelectEvents=cms.vstring())
+				for alca in self.AlCaPaths:
+					output.SelectEvents.SelectEvents.extend(getattr(self.process,'OutALCARECO'+alca).SelectEvents.SelectEvents)
+
 			
 			if hasattr(self.process,theModuleLabel):
 				raise Exception("the current process already has a module "+theModuleLabel+" defined")
@@ -671,15 +698,11 @@ class ConfigBuilder(object):
 		else:
 			self.loadAndRemember(mixingDict['file'])
 
-		# FastSim: transform cfg of MixingModule from FullSim to FastSim 
-		if self._options.fast:
-			self._options.customisation_file.insert(0,"FastSimulation/Configuration/MixingModule_Full2Fast.prepareDigiRecoMixing")
-
 		mixingDict.pop('file')
 		if not "DATAMIX" in self.stepMap.keys(): # when DATAMIX is present, pileup_input refers to pre-mixed GEN-RAW
 			if self._options.pileup_input:
 				if self._options.pileup_input.startswith('dbs:') or self._options.pileup_input.startswith('das:'):
-					mixingDict['F']=filesFromDASQuery('file dataset = %s'%(self._options.pileup_input[4:],))[0]
+					mixingDict['F']=filesFromDASQuery('file dataset = %s'%(self._options.pileup_input[4:],),self._options.pileup_dasoption)[0]
 				else:
 					mixingDict['F']=self._options.pileup_input.split(',')
 			specialization=defineMixing(mixingDict)
@@ -774,19 +797,9 @@ class ConfigBuilder(object):
 		self._options.conditions = self._options.conditions.replace("FrontierConditions_GlobalTag,",'')
 						
         self.loadAndRemember(self.ConditionsDefaultCFF)
-
-	if self._options.useCondDBv1:
-		from Configuration.AlCa.GlobalTag_condDBv1 import GlobalTag
-	else:
-		from Configuration.AlCa.GlobalTag import GlobalTag
-
+        from Configuration.AlCa.GlobalTag import GlobalTag
         self.process.GlobalTag = GlobalTag(self.process.GlobalTag, self._options.conditions, self._options.custom_conditions)
-
-	if self._options.useCondDBv1:
-	        self.additionalCommands.append('from Configuration.AlCa.GlobalTag_condDBv1 import GlobalTag')
-	else:
-	        self.additionalCommands.append('from Configuration.AlCa.GlobalTag import GlobalTag')
-
+        self.additionalCommands.append('from Configuration.AlCa.GlobalTag import GlobalTag')
         self.additionalCommands.append('process.GlobalTag = GlobalTag(process.GlobalTag, %s, %s)' % (repr(self._options.conditions), repr(self._options.custom_conditions)))
 
 	if self._options.slhc:
@@ -914,10 +927,7 @@ class ConfigBuilder(object):
         self.HARVESTINGDefaultCFF="Configuration/StandardSequences/Harvesting_cff"
         self.ALCAHARVESTDefaultCFF="Configuration/StandardSequences/AlCaHarvesting_cff"
         self.ENDJOBDefaultCFF="Configuration/StandardSequences/EndOfProcess_cff"
-        if self._options.useCondDBv1:
-	    self.ConditionsDefaultCFF = "Configuration/StandardSequences/FrontierConditions_GlobalTag_condDBv1_cff"
-	else:
-            self.ConditionsDefaultCFF = "Configuration/StandardSequences/FrontierConditions_GlobalTag_cff"
+        self.ConditionsDefaultCFF = "Configuration/StandardSequences/FrontierConditions_GlobalTag_cff"
         self.CFWRITERDefaultCFF = "Configuration/StandardSequences/CrossingFrameWriter_cff"
         self.REPACKDefaultCFF="Configuration/StandardSequences/DigiToRaw_Repack_cff"
 
@@ -951,7 +961,7 @@ class ConfigBuilder(object):
         self.RAW2DIGIDefaultSeq='RawToDigi'
         self.L1RecoDefaultSeq='L1Reco'
         self.L1TrackTriggerDefaultSeq='L1TrackTrigger'
-        if 'RAW2DIGI' in self.stepMap and 'RECO' in self.stepMap:
+        if self._options.fast or ('RAW2DIGI' in self.stepMap and 'RECO' in self.stepMap):
                 self.RECODefaultSeq='reconstruction'
         else:
                 self.RECODefaultSeq='reconstruction_fromRECO'
@@ -1077,33 +1087,14 @@ class ConfigBuilder(object):
             self.SIMDefaultCFF="Configuration/StandardSequences/SimNOBEAM_cff"
             self._options.beamspot='NoSmear'
 
-        # if fastsim switch event content
+        # fastsim requires some changes to the default cff files and sequences
 	if self._options.fast:
 		self.SIMDefaultCFF = 'FastSimulation.Configuration.SimIdeal_cff'
-		self.SIMDefaultSeq = 'psim'
 		self.RECODefaultCFF= 'FastSimulation.Configuration.Reconstruction_AftMix_cff'
-		self.RECODefaultSeq= 'reconstruction'
-                self.EVTCONTDefaultCFF = "FastSimulation.Configuration.EventContent_cff"
-                self.VALIDATIONDefaultCFF = "FastSimulation.Configuration.Validation_cff"
 		self.RECOBEFMIXDefaultCFF = 'FastSimulation.Configuration.Reconstruction_BefMix_cff'
 		self.RECOBEFMIXDefaultSeq = 'reconstruction_befmix'
-		self.DIGIDefaultCFF = 'FastSimulation.Configuration.Digi_cff'
-		if self._options.datamix == 'PreMix':
-			self.DIGIDefaultCFF="FastSimulation.Configuration.DigiDMPreMix_cff"
-		if "DIGIPREMIX" in self.stepMap.keys():
-			self.DIGIDefaultCFF="FastSimulation.Configuration.Digi_PreMix_cff"
-		if "DATAMIX" in self.stepMap.keys():
-			self.DATAMIXDefaultCFF="FastSimulation.Configuration.DataMixer"+self._options.datamix+"_cff"
-
-		self.DIGIDefaultSeq = 'pdigi'
-		self.L1EMDefaultCFF='FastSimulation.Configuration.SimL1Emulator_cff'
 		self.L1RecoDefaultCFF='FastSimulation.Configuration.L1Reco_cff'
-		self.DIGI2RAWDefaultCFF = 'FastSimulation.Configuration.DigiToRaw_cff'
-		self.DIGI2RAWDefaultSeq = 'DigiToRaw'
-		self.EVTCONTDefaultCFF = "FastSimulation.Configuration.EventContent_cff"
-		self.VALIDATIONDefaultCFF = "FastSimulation.Configuration.Validation_cff"
-
-		
+                self.DQMOFFLINEDefaultCFF="FastSimulation.Configuration.DQMOfflineMC_cff"
 
         # Mixing
 	if self._options.pileup=='default':
@@ -1240,6 +1231,7 @@ class ConfigBuilder(object):
 
     def prepare_ALCA(self, sequence = None, workflow = 'full'):
         """ Enrich the process with alca streams """
+	print 'DL enriching',workflow,sequence
         alcaConfig=self.loadDefaultOrSpecifiedCFF(sequence,self.ALCADefaultCFF)
         sequence = sequence.split('.')[-1]
 
@@ -1249,12 +1241,14 @@ class ConfigBuilder(object):
 	from Configuration.AlCa.autoAlca import autoAlca
 	# support @X from autoAlca.py, and recursion support: i.e T0:@Mu+@EG+...
 	self.expandMapping(alcaList,autoAlca)
-	
+	self.AlCaPaths=[]
         for name in alcaConfig.__dict__:
             alcastream = getattr(alcaConfig,name)
             shortName = name.replace('ALCARECOStream','')
             if shortName in alcaList and isinstance(alcastream,cms.FilteredStream):
 	        output = self.addExtraStream(name,alcastream, workflow = workflow)
+		self.executeAndRemember('process.ALCARECOEventContent.outputCommands.extend(process.OutALCARECO'+shortName+'_noDrop.outputCommands)')
+		self.AlCaPaths.append(shortName)
 		if 'DQM' in alcaList:
 			if not self._options.inlineEventContent and hasattr(self.process,name):
 				self.executeAndRemember('process.' + name + '.outputCommands.append("keep *_MEtoEDMConverter_*_*")')
@@ -1472,7 +1466,7 @@ class ConfigBuilder(object):
 	    if self._options.pileup_input:
 		    theFiles=''
 		    if self._options.pileup_input.startswith('dbs:') or self._options.pileup_input.startswith('das:'):
-			    theFiles=filesFromDASQuery('file dataset = %s'%(self._options.pileup_input[4:],))[0]
+			    theFiles=filesFromDASQuery('file dataset = %s'%(self._options.pileup_input[4:],),self._options.pileup_dasoption)[0]
 		    elif self._options.pileup_input.startswith("filelist:"):
 			    theFiles= (filesFromList(self._options.pileup_input[9:]))[0]
 		    else:
@@ -1505,7 +1499,7 @@ class ConfigBuilder(object):
 
     def prepare_L1REPACK(self, sequence = None):
             """ Enrich the schedule with the L1 simulation step, running the L1 emulator on data unpacked from the RAW collection, and repacking the result in a new RAW collection"""
-	    supported = ['GT','GT1','GT2','GCTGT']
+	    supported = ['GT','GT1','GT2','GCTGT','Full']
             if sequence in supported:
                 self.loadAndRemember('Configuration/StandardSequences/SimL1EmulatorRepack_%s_cff'%sequence)
 		if self._options.scenario == 'HeavyIons':
@@ -1592,6 +1586,12 @@ class ConfigBuilder(object):
 	    #self.renameInputTagsInSequence(sequence)
             return
 
+    def prepare_PATFILTER(self, sequence=None):
+            self.loadAndRemember("PhysicsTools/PatAlgos/slimming/metFilterPaths_cff")
+	    from PhysicsTools.PatAlgos.slimming.metFilterPaths_cff import allMetFilterPaths
+	    for filt in allMetFilterPaths:
+		    self.schedule.append(getattr(self.process,'Flag_'+filt))
+
     def prepare_L1HwVal(self, sequence = 'L1HwVal'):
         ''' Enrich the schedule with L1 HW validation '''
         self.loadDefaultOrSpecifiedCFF(sequence,self.L1HwValDefaultCFF)
@@ -1660,6 +1660,7 @@ class ConfigBuilder(object):
 
     def prepare_PAT(self, sequence = "miniAOD"):
         ''' Enrich the schedule with PAT '''
+	self.prepare_PATFILTER(self)
         self.loadDefaultOrSpecifiedCFF(sequence,self.PATDefaultCFF,1) #this is unscheduled
 	if not self._options.runUnscheduled:	
 		raise Exception("MiniAOD production can only run in unscheduled mode, please run cmsDriver with --runUnscheduled")
@@ -1773,10 +1774,7 @@ class ConfigBuilder(object):
 			    return ''
 		    else:
 			    return '%s'%index
-		    
-            if not 'DIGI' in self.stepMap and not self._options.fast and not any(map( lambda s : s.startswith('genvalid'), valSeqName)):
-		    if self._options.restoreRNDSeeds==False and not self._options.restoreRNDSeeds==True:
-			    self._options.restoreRNDSeeds=True
+
 
             #rename the HLT process in validation steps
 	    if ('HLT' in self.stepMap and not self._options.fast) or self._options.hltProcess:
@@ -1791,6 +1789,14 @@ class ConfigBuilder(object):
 	    for (i,s) in enumerate(valSeqName):
 		    setattr(self.process,'validation_step%s'%NFI(i), cms.EndPath( getattr(self.process, s)))
 		    self.schedule.append(getattr(self.process,'validation_step%s'%NFI(i)))
+
+            #needed in case the miniAODValidation sequence is run starting from AODSIM
+	    if 'PAT' in self.stepMap and not 'RECO' in self.stepMap:
+		    return
+
+            if not 'DIGI' in self.stepMap and not self._options.fast and not any(map( lambda s : s.startswith('genvalid'), valSeqName)):
+		    if self._options.restoreRNDSeeds==False and not self._options.restoreRNDSeeds==True:
+			    self._options.restoreRNDSeeds=True
 
 	    if not 'DIGI' in self.stepMap and not self._options.fast:
 		    self.executeAndRemember("process.mix.playback = True")
@@ -1913,14 +1919,16 @@ class ConfigBuilder(object):
 
         self.loadDefaultOrSpecifiedCFF(sequence,self.DQMOFFLINEDefaultCFF)
         sequenceList=sequence.split('.')[-1].split('+')
+        postSequenceList=sequence.split('.')[-1].split('+')
 	from DQMOffline.Configuration.autoDQM import autoDQM
 	self.expandMapping(sequenceList,autoDQM,index=0)
+	self.expandMapping(postSequenceList,autoDQM,index=1)
 	
 	if len(set(sequenceList))!=len(sequenceList):
 		sequenceList=list(set(sequenceList))
 		print "Duplicate entries for DQM:, using",sequenceList
+
 	pathName='dqmoffline_step'
-	
 	for (i,sequence) in enumerate(sequenceList):
 		if (i!=0):
 			pathName='dqmoffline_%d_step'%(i)
@@ -1929,7 +1937,8 @@ class ConfigBuilder(object):
 			self.renameHLTprocessInSequence(sequence)
 
 		# if both HLT and DQM are run in the same process, schedule [HLT]DQM in an EndPath
-		if 'HLT' in self.stepMap.keys():
+	        # not for fastsim
+		if 'HLT' in self.stepMap.keys() and not self._options.fast:
 			# need to put [HLT]DQM in an EndPath, to access the HLT trigger results
 			setattr(self.process,pathName, cms.EndPath( getattr(self.process, sequence ) ) )
 		else:
@@ -1937,12 +1946,24 @@ class ConfigBuilder(object):
 			setattr(self.process,pathName, cms.Path( getattr(self.process, sequence) ) ) 
 		self.schedule.append(getattr(self.process,pathName))
 
+	pathName='dqmofflineOnPAT_step'
+	for (i,sequence) in enumerate(postSequenceList):
+                if (i!=0):
+                        pathName='dqmofflineOnPAT_%d_step'%(i)
+
+		# if both MINIAOD and DQM are run in the same process, schedule DQM in an EndPath
+		if 'PAT' in self.stepMap.keys():
+			# need to put DQM in an EndPath, to access the miniAOD filter results
+			setattr(self.process,pathName, cms.EndPath( getattr(self.process, sequence ) ) )
+		else:
+			# schedule DQM as a standard Path
+			setattr(self.process,pathName, cms.Path( getattr(self.process, sequence) ) )
+		self.schedule.append(getattr(self.process,pathName))
 
     def prepare_HARVESTING(self, sequence = None):
         """ Enrich the process with harvesting step """
-        self.EDMtoMECFF='Configuration/StandardSequences/EDMtoME'+self._options.harvesting+'_cff'
-        self.loadAndRemember(self.EDMtoMECFF)
-	self.scheduleSequence('EDMtoME','edmtome_step')
+        self.DQMSaverCFF='Configuration/StandardSequences/DQMSaver'+self._options.harvesting+'_cff'
+        self.loadAndRemember(self.DQMSaverCFF)
 
         harvestingConfig = self.loadDefaultOrSpecifiedCFF(sequence,self.HARVESTINGDefaultCFF)
         sequence = sequence.split('.')[-1]

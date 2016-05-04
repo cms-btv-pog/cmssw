@@ -51,6 +51,6 @@ SUSY_HLT_Ele_HT_SingleLepton_POSTPROCESSING = cms.EDAnalyzer('DQMGenericClient',
                                                              resolution = cms.vstring('')
                                                              )
 
-SUSY_HLT_Ele_HT_SingleLepton_FASTSIM = deepcopy(SUSY_HLT_Ele_HT_SingleLepton)
-
-SUSY_HLT_Ele_HT_SingleLepton_FASTSIM_POSTPROCESSING = deepcopy(SUSY_HLT_Ele_HT_SingleLepton_POSTPROCESSING)
+# fastsim has no conversion collection (yet)
+from Configuration.StandardSequences.Eras import eras
+eras.fastSim.toModify(SUSY_HLT_Ele_HT_SingleLepton,conversionCollection=cms.InputTag(''))

@@ -9,8 +9,11 @@
 #include "DataFormats/MuonDetId/interface/DTLayerId.h"
 #include "DataFormats/MuonDetId/interface/CSCDetId.h"
 #include "DataFormats/MuonDetId/interface/RPCDetId.h"
+#include "DataFormats/MuonDetId/interface/GEMDetId.h"
+#include "DataFormats/MuonDetId/interface/ME0DetId.h"
 
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
+
 
 #include<bitset>
 
@@ -114,6 +117,22 @@ namespace {
                     layer |= abs(rpcid.region());
                 }
                 break;
+            case MuonSubdetId::GEM:
+            {
+              GEMDetId gemid(id.rawId());
+              layer = ((gemid.station()-1)<<2);
+              layer |= abs(gemid.layer()-1);
+            }
+	    break;
+	    case MuonSubdetId::ME0:
+	      {
+		ME0DetId me0id(id.rawId());
+		//layer = ((me0id.roll()-1)<<1) + abs(me0id.layer()-1);
+		//layer = ((me0id.roll()-1)<<1) + abs(me0id.layer());
+		//Only layer information that is meaningful is in the roll/etapartition
+		layer = (me0id.roll());
+	      }
+	      break;
             }
         }
         return layer;
@@ -150,7 +169,7 @@ uint16_t HitPattern::encode(uint16_t det, uint16_t subdet, uint16_t layer, uint1
     // adding tracker/muon detector bit
     pattern |= (det & SubDetectorMask) << SubDetectorOffset;
 
-    // adding substructure (PXB, PXF, TIB, TID, TOB, TEC, or DT, CSC, RPC) bits
+    // adding substructure (PXB, PXF, TIB, TID, TOB, TEC, or DT, CSC, RPC,GEM) bits
     pattern |= (subdet & SubstrMask) << SubstrOffset;
 
     // adding layer/disk/wheel bits
@@ -839,9 +858,14 @@ void HitPattern::printHitPattern(HitCategory category, int position, std::ostrea
         } else if (muonRPCHitFilter(pattern)) {
             stream << "\trpc " << (getRPCregion(pattern) ? "endcaps" : "barrel")
                    << ", layer " << getRPCLayer(pattern);
-        } else {
-            stream << "(UNKNOWN Muon SubStructure!) \tsubsubstructure "
-                   << getSubStructure(pattern);
+        } else if (muonGEMHitFilter(pattern)) {
+            stream << "\tgem " << (getGEMLayer(pattern) ? "layer1" : "layer2") 
+                   << ", station " << getGEMStation(pattern);
+	} else if (muonME0HitFilter(pattern)) { 
+   	    stream << "\tme0 ";
+	} else {
+	  stream << "(UNKNOWN Muon SubStructure!) \tsubsubstructure "
+		 << getSubStructure(pattern);
         }
     } else {
         stream << "\tlayer " << getLayer(pattern);
