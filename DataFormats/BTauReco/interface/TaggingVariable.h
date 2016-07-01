@@ -39,7 +39,13 @@ namespace reco {
       jetPhi,                                   // jet polar angle
       jetNTracks,                               // tracks associated to jet
       jetNSelectedTracks,                       // tracks associated to jet
-			jetNTracksEtaRel,                         // number of tracks for which etaRel is computed
+      jetNTracksEtaRel,                         // number of tracks for which etaRel is computed
+
+      jetNTracks_PV,                            // tracks associated to jet coming from primary Vertex
+      jetNTracks_nonPV,                         // tracks associated to jet not coming from primary Vertex
+      jetPt_Tracks,                             // jet transverse momentum from the vector sum of the transverse momentum of associated tracks
+      jetPt_PVTracks,                           // jet transverse momentum from the vector sum of the transverse momentum of associated tracks coming from primary vertex
+      jetPt_nonPVTracks,                        // jet transverse momentum from the vector sum of the transverse momentum of associated tracks not coming from primary vertex
 
       trackMomentum,                            // track momentum
       trackEta,                                 // track pseudorapidity
@@ -54,10 +60,25 @@ namespace reco {
       trackPtRatio,                             // track transverse momentum, relative to the jet axis, normalized to its energy
       trackPParRatio,                           // track parallel momentum, along the jet axis, normalized to its energy
 
+      trackIp1dVal,                             // track 1D impact parameter
+      trackIp1dSig,                             // track 1D impact parameter signifncance
+      trackIp2dVal,                             // track 2D impact parameter 
+      trackIp2dSig,                             // track 2D impact parameter signifncance
+      trackIp3dVal,                             // track 3D impact parameter 
+      trackIp3dSig,                             // track 3D impact parameter signifncance
+      trackSip1dVal,                            // track 1D signed impact parameter
+      trackSip1dSig,                            // track 1D signed impact parameter significance
       trackSip2dVal,                            // track 2D signed impact parameter
       trackSip2dSig,                            // track 2D signed impact parameter significance
       trackSip3dVal,                            // track 3D signed impact parameter
       trackSip3dSig,                            // track 3D signed impact parameter significance
+      trackAveSip1dVal,                         // Average 1D signed impact parameter 
+      trackAveSip1dSig,                         // Average 1D signed impact parameter significance
+      trackAveSip2dVal,                         // Average 1D signed impact parameter
+      trackAveSip2dSig,                         // Average 1D signed impact parameter significance
+      trackAveSip3dVal,                         // Average 1D signed impact parameter
+      trackAveSip3dSig,                         // Average 1D signed impact parameter significance
+
       trackDecayLenVal,                         // track decay length
       trackDecayLenSig,                         // track decay length significance
       trackJetDistVal,                          // minimum track approach distance to jet axis
@@ -88,6 +109,10 @@ namespace reco {
       flightDistance2dSig,                      // transverse distance significance between primary and secondary vertex
       flightDistance3dVal,                      // distance between primary and secondary vertex
       flightDistance3dSig,                      // distance significance between primary and secondary vertex
+      SVchi2_ndf_ratio,                         // ratio of the chi2 and ndf of the fit of the secondry vertex
+      SVnum2tv,                                 // Fraction of times that two jet tracks do not come from the same vertex  
+      DCA_2tracks_3d,                           // 3D Distance of closest approach between two track 
+      DCA_2tracks_2d,                           //22D Distance of closest approach between two track
 
       trackSip2dValAboveCharm,                  // track 2D signed impact parameter of first track lifting mass above charm
       trackSip2dSigAboveCharm,                  // track 2D signed impact parameter significance of first track lifting mass above charm
