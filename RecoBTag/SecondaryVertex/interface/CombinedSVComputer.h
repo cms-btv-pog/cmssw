@@ -28,12 +28,12 @@
 #include "DataFormats/BTauReco/interface/ParticleMasses.h"
 #include "DataFormats/JetReco/interface/PFJet.h"
 #include "DataFormats/PatCandidates/interface/Jet.h"
+#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 
 #include "RecoBTag/SecondaryVertex/interface/TrackSelector.h"
 #include "RecoBTag/SecondaryVertex/interface/V0Filter.h"
 #include "RecoBTag/SecondaryVertex/interface/TrackSorting.h"
 #include "RecoBTag/SecondaryVertex/interface/TrackKinematics.h"
-
 
 #define range_for(i, x) \
         for(int i = (x).begin; i != (x).end; i += (x).increment)
@@ -143,6 +143,11 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
 		vars.insert(btau::flightDistance3dSig,flipValue(svInfo.flightDistance(vtx, 3).significance(),true),true);
 		vars.insert(btau::vertexJetDeltaR,Geom::deltaR(svInfo.flightDirection(vtx), jetDir),true);
 		vars.insert(btau::jetNSecondaryVertices, svInfo.nVertices(), true);
+                vars.insert(btau::SVchi2_ndf_ratio,svInfo.chi2ndf(vtx),true);
+                vars.insert(btau::SVnum2tv,svInfo.num2tv(vtx),true);
+                vars.insert(btau::DCA_2tracks_2d,svInfo.dca2d2t(vtx),true);
+                vars.insert(btau::DCA_2tracks_3d,svInfo.dca3d2t(vtx),true);
+                std::cout<<"bla1"<<svInfo.chi2ndf(vtx)<<std::endl;
 	}
 
 	std::vector<std::size_t> indices = ipInfo.sortedIndexes(sortCriterium);
@@ -150,6 +155,17 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
 
 	const Container &tracks = ipInfo.selectedTracks();
 	std::vector<TrackRef> pseudoVertexTracks;
+        std::vector<TrackRef> Tracks;
+        double AveSip3dVal = 0;
+        double AveSip2dVal = 0;
+        double AveSip1dVal = 0;
+        double AveSip3dSig = 0;
+        double AveSip2dSig = 0;
+        double AveSip1dSig = 0;
+        math::PtEtaPhiMLorentzVector chtrks_LV(0,0,0,0);
+        math::PtEtaPhiMLorentzVector chtrkspv_LV(0,0,0,0);
+        math::PtEtaPhiMLorentzVector chtrksnpv_LV(0,0,0,0);
+        std::vector<TrackRef> jetchtrks; std::vector<TrackRef> jetchtrkspv;std::vector<TrackRef> jetchtrksnpv;
 
         std::vector<TrackRef> trackPairV0Test(2);
         range = flipIterate(indices.size(), false);
@@ -157,6 +173,54 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
                 std::size_t idx = indices[i];
                 const reco::btag::TrackIPData &data = ipData[idx];
                 const TrackRef &track = tracks[idx];
+                const reco::VertexRef & vertexRef = ipInfo.primaryVertex();
+                float PVweight = 0.;
+                const pat::PackedCandidate * pcand = dynamic_cast<const pat::PackedCandidate *>(track.get());
+                if(pcand){
+                    if(pcand->fromPV()>1){
+                       math::PtEtaPhiMLorentzVector chtrks_LV2(pcand->pt(),pcand->eta(),pcand->phi(),pcand->mass());
+                       jetchtrks.push_back(track);
+                       chtrks_LV += chtrks_LV2;
+                       if( pcand->fromPV() == pat::PackedCandidate::PVUsedInFit ){
+                           math::PtEtaPhiMLorentzVector chtrkspv_LV2(pcand->pt(),pcand->eta(),pcand->phi(),pcand->mass());
+                           chtrkspv_LV += chtrkspv_LV2;
+                           jetchtrkspv.push_back(track);
+                       }else{
+                           math::PtEtaPhiMLorentzVector chtrksnpv_LV2(pcand->pt(),pcand->eta(),pcand->phi(),pcand->mass());
+                           chtrksnpv_LV += chtrksnpv_LV2;
+                           jetchtrksnpv.push_back(track);
+                       }
+
+                   }
+                }else{
+                  const reco::PFCandidate * pfcand = dynamic_cast<const reco::PFCandidate *>(track.get());
+                  if(pfcand){
+                       math::PtEtaPhiMLorentzVector chtrks_LV2(pfcand->pt(),pfcand->eta(),pfcand->phi(),pfcand->mass());
+                       jetchtrks.push_back(track);
+
+                       const reco::TrackRef & trackRef  = pfcand->trackRef();
+                       const reco::TrackBaseRef trackBaseRef( trackRef );
+                       typedef reco::Vertex::trackRef_iterator IT;
+                       const reco::Vertex & vtx = *(vertexRef);
+                       for(IT it=vtx.tracks_begin(); it!=vtx.tracks_end(); ++it){
+                           const reco::TrackBaseRef & baseRef = *it;
+                           if( baseRef == trackBaseRef ){
+                               PVweight = vtx.trackWeight(baseRef);
+                               break;
+                           }
+                       }
+                       if(PVweight>0.5){
+                          math::PtEtaPhiMLorentzVector chtrkspv_LV2(pfcand->pt(),pfcand->eta(),pfcand->phi(),pfcand->mass());
+                          chtrkspv_LV += chtrkspv_LV2;
+                          jetchtrkspv.push_back(track);  
+                       }else{
+                          math::PtEtaPhiMLorentzVector chtrksnpv_LV2(pfcand->pt(),pfcand->eta(),pfcand->phi(),pfcand->mass());
+                          chtrksnpv_LV += chtrksnpv_LV2;
+                          jetchtrksnpv.push_back(track);   
+                       }
+                    }
+                }
+                //std::cout<<"panga should be solved"<<PVweight<<std::endl;
 
                 jet_track_ESum += std::sqrt(track->momentum().Mag2() + ROOT::Math::Square(ParticleMasses::piPlus));
 
@@ -204,11 +268,29 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
                 // add track variables
                 math::XYZVector trackMom = track->momentum();
                 double trackMag = std::sqrt(trackMom.Mag2());
+                Tracks.push_back(track);
+                vars.insert(btau::trackIp3dVal, flipValue(data.Absip3d.value(), false), true);
+                vars.insert(btau::trackIp3dSig, flipValue(data.Absip3d.significance(), false), true);
+                vars.insert(btau::trackIp2dVal, flipValue(data.Absip2d.value(), false), true);
+                vars.insert(btau::trackIp2dSig, flipValue(data.Absip2d.significance(), false), true);
+                vars.insert(btau::trackIp1dVal, flipValue(data.Absip1d.value(), false), true);
+                vars.insert(btau::trackIp1dSig, flipValue(data.Absip1d.significance(), false), true);
 
                 vars.insert(btau::trackSip3dVal, flipValue(data.ip3d.value(), false), true);
                 vars.insert(btau::trackSip3dSig, flipValue(data.ip3d.significance(), false), true);
                 vars.insert(btau::trackSip2dVal, flipValue(data.ip2d.value(), false), true);
                 vars.insert(btau::trackSip2dSig, flipValue(data.ip2d.significance(), false), true);
+                vars.insert(btau::trackSip1dVal, flipValue(data.ip1d.value(), false), true);
+                vars.insert(btau::trackSip1dSig, flipValue(data.ip1d.significance(), false), true);
+                //calculate the Average IP
+                AveSip3dVal += flipValue(data.ip3d.value(), false);
+                AveSip3dSig += flipValue(data.ip3d.significance(), false);
+                AveSip2dVal += flipValue(data.ip2d.value(), false);
+                AveSip2dSig += flipValue(data.ip2d.significance(), false);
+                AveSip1dVal += flipValue(data.ip1d.value(), false);
+                AveSip1dSig += flipValue(data.ip1d.significance(), false);
+
+                
                 vars.insert(btau::trackJetDistVal, data.distanceToJetAxis.value(), true);
 //              vars.insert(btau::trackJetDistSig, data.distanceToJetAxis.significance(), true);
 //              vars.insert(btau::trackFirstTrackDist, data.distanceToFirstTrack, true);
@@ -224,6 +306,19 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
                 vars.insert(btau::trackDeltaR, VectorUtil::DeltaR(trackMom, jetDir), true);
                 vars.insert(btau::trackPtRatio, VectorUtil::Perp(trackMom, jetDir) / trackMag, true);
                 vars.insert(btau::trackPParRatio, jetDir.Dot(trackMom) / trackMag, true);
+        }
+        vars.insert(btau::jetNTracks_PV,jetchtrkspv.size(), true);
+        vars.insert(btau::jetNTracks_nonPV,jetchtrksnpv.size(), true);
+        vars.insert(btau::jetPt_Tracks,chtrks_LV.pt(), true);
+        vars.insert(btau::jetPt_PVTracks,chtrkspv_LV.pt(), true);
+        vars.insert(btau::jetPt_nonPVTracks,chtrksnpv_LV.pt(), true);
+        if(Tracks.size()>0){
+          vars.insert(btau::trackAveSip3dVal, AveSip3dVal/Tracks.size(), true);
+          vars.insert(btau::trackAveSip3dSig, AveSip3dSig/Tracks.size(), true);
+          vars.insert(btau::trackAveSip2dVal, AveSip2dVal/Tracks.size(), true);
+          vars.insert(btau::trackAveSip2dSig, AveSip2dSig/Tracks.size(), true);
+          vars.insert(btau::trackAveSip1dVal, AveSip1dVal/Tracks.size(), true);
+          vars.insert(btau::trackAveSip1dSig, AveSip1dSig/Tracks.size(), true);
         }
 
         if (vtxType == btag::Vertices::NoVertex && vertexKinematics.numberOfTracks() >= pseudoMultiplicityMin && pseudoVertexV0Filter(pseudoVertexTracks))
