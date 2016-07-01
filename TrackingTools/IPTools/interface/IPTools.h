@@ -39,6 +39,11 @@ namespace IPTools
    */
 	std::pair<bool,Measurement1D> signedTransverseImpactParameter(const reco::TransientTrack & track,
  	         const GlobalVector & direction, const  reco::Vertex & vertex);
+   /**
+   *  Returns unsigned 1D impact parameter
+   */
+        std::pair<bool,Measurement1D> absoluteImpactParameter1D(const reco::TransientTrack & transientTrack, const  reco::Vertex & vertex);
+
 
    /**
    *  Returns life time signed 3D impact parameter
@@ -48,6 +53,13 @@ namespace IPTools
 
 	std::pair<bool,Measurement1D> signedImpactParameter3D(const reco::TransientTrack & track,
  	         const GlobalVector & direction, const  reco::Vertex & vertex);
+                                   
+   /**
+   *  Returns the signed 1D impact parameter.
+   *   
+   */
+        std::pair<bool,Measurement1D> signedImpactParameter1D(const reco::TransientTrack & track,
+                 const GlobalVector & direction, const  reco::Vertex & vertex);
 
         /// Impact parameter without direction (internally used)
         std::pair<bool,Measurement1D> absoluteImpactParameter(const TrajectoryStateOnSurface & tsos  , const  reco::Vertex & vertex, VertexDistance & distanceComputer) ;

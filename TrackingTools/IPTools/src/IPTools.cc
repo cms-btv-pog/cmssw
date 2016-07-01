@@ -46,6 +46,23 @@ namespace IPTools
       VertexDistanceXY dist;
       return absoluteImpactParameter(extrapolator.extrapolate(transientTrack.impactPointState(), RecoVertex::convertPos(vertex.position())), vertex,  dist);
     }
+    std::pair<bool,Measurement1D> absoluteImpactParameter1D(const reco::TransientTrack & transientTrack, const  reco::Vertex & vertex)
+    {
+      GlobalPoint vert(vertex.position().x(), vertex.position().y(), vertex.position().z());
+      AnalyticalImpactPointExtrapolator extrapolator(transientTrack.field());
+      TrajectoryStateOnSurface tsos = extrapolator.extrapolate(transientTrack.impactPointState(),vert);
+      if(!tsos.isValid()) {
+         return pair<bool,Measurement1D>(false,Measurement1D(0.,0.)) ;
+        }
+      GlobalPoint refPoint          = tsos.globalPosition();
+      GlobalError refPointErr       = tsos.cartesianError().position();
+      GlobalPoint vertexPosition    = RecoVertex::convertPos(vertex.position());
+      GlobalError vertexPositionErr = RecoVertex::convertError(vertex.error());
+      GlobalVector diff             = refPoint - vertexPosition;
+      AlgebraicSymMatrix33 error    = refPointErr.matrix()+ vertexPositionErr.matrix();
+      AlgebraicVector3 vDiff(0,0,diff.z());
+      return pair<bool,Measurement1D>(true,Measurement1D(sqrt(pow(diff.z(),2)),sqrt(ROOT::Math::Similarity(error,vDiff))/sqrt(pow(diff.z(),2))));
+    }
     
   pair<bool,Measurement1D> signedTransverseImpactParameter(const TransientTrack & track,
                                                            const GlobalVector & direction, const  Vertex & vertex){
@@ -67,6 +84,29 @@ namespace IPTools
     //Apply sign to the result
     return pair<bool,Measurement1D>(result.first,Measurement1D(sign*result.second.value(), result.second.error()));
   }
+  pair<bool,Measurement1D> signedImpactParameter1D(const TransientTrack & track,
+                                                           const GlobalVector & direction, const  Vertex & vertex){
+    GlobalPoint vert(vertex.position().x(), vertex.position().y(), vertex.position().z());
+    AnalyticalImpactPointExtrapolator extrapolator(track.field());
+    TrajectoryStateOnSurface tsos = extrapolator.extrapolate(track.impactPointState(),vert);
+    if(!tsos.isValid()) {
+         return pair<bool,Measurement1D>(false,Measurement1D(0.,0.)) ;
+    }
+    GlobalPoint refPoint          = tsos.globalPosition();
+    GlobalError refPointErr       = tsos.cartesianError().position();
+    GlobalPoint vertexPosition    = RecoVertex::convertPos(vertex.position());
+    GlobalError vertexPositionErr = RecoVertex::convertError(vertex.error());
+    GlobalVector diff             = refPoint - vertexPosition;
+    AlgebraicSymMatrix33 error    = refPointErr.matrix()+ vertexPositionErr.matrix();
+    AlgebraicVector3 vDiff(0,0,diff.z());
+    GlobalPoint impactPoint = tsos.globalPosition();
+    GlobalVector IPVec(impactPoint.x()-vertex.x(),impactPoint.y()-vertex.y(),impactPoint.z()-vertex.z());
+    double prod = IPVec.dot(direction);
+    double sign = (prod>=0) ? 1. : -1.;
+    return pair<bool,Measurement1D>(true,Measurement1D(sign*sqrt(pow(diff.z(),2)),sqrt(ROOT::Math::Similarity(error,vDiff))/sqrt(pow(diff.z(),2))));
+
+  }
+
 
   pair<bool,Measurement1D> signedImpactParameter3D(const TransientTrack & track,
                                                            const GlobalVector & direction, const  Vertex & vertex){

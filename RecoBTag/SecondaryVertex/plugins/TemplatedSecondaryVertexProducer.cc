@@ -6,6 +6,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <TMath.h>
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -31,6 +32,10 @@
 #include "DataFormats/BTauReco/interface/CandIPTagInfo.h"
 #include "DataFormats/BTauReco/interface/SecondaryVertexTagInfo.h"
 
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexFitter.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexUpdator.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexTrackCompatibilityEstimator.h"
+#include "RecoVertex/KalmanVertexFit/interface/KalmanVertexSmoother.h"
 #include "RecoVertex/VertexPrimitives/interface/VertexException.h"
 #include "RecoVertex/VertexPrimitives/interface/ConvertToFromReco.h"
 #include "RecoVertex/ConfigurableVertexReco/interface/ConfigurableVertexReconstructor.h"
@@ -38,11 +43,13 @@
 #include "RecoVertex/GhostTrackFitter/interface/GhostTrackPrediction.h"
 #include "RecoVertex/GhostTrackFitter/interface/GhostTrackState.h"
 #include "RecoVertex/GhostTrackFitter/interface/GhostTrack.h"
+#include "RecoVertex/KinematicFitPrimitives/interface/KinematicParticleFactoryFromTransientTrack.h"
 
 #include "TrackingTools/TransientTrack/interface/TransientTrack.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
 #include "TrackingTools/TransientTrack/interface/CandidatePtrTransientTrack.h"
 #include "TrackingTools/Records/interface/TransientTrackRecord.h"
+#include "TrackingTools/PatternTools/interface/TwoTrackMinimumDistance.h"
 
 #include "RecoBTag/SecondaryVertex/interface/TrackSelector.h"
 #include "RecoBTag/SecondaryVertex/interface/TrackSorting.h"
@@ -55,7 +62,7 @@
 #include "fastjet/JetDefinition.hh"
 #include "fastjet/ClusterSequence.hh"
 #include "fastjet/PseudoJet.hh"
-
+KalmanVertexFitter vtxFitter(true);
 //
 // constants, enums and typedefs
 //
@@ -89,6 +96,78 @@ namespace {
 		}
 	};
 }
+std::pair<double,double> dca2trks(TransientTrack ttkA, TransientTrack ttkB){
+ double dca3d2trks_sig = 0;
+ double dca2d2trks_sig = 0;
+ if(ttkA.impactPointTSCP().isValid() && ttkB.impactPointTSCP().isValid()){
+  FreeTrajectoryState state1 = ttkA.impactPointTSCP().theState();
+  FreeTrajectoryState state2 = ttkB.impactPointTSCP().theState();
+  TwoTrackMinimumDistance minDist;
+  minDist.calculate(state1, state2);
+  if(minDist.status()){
+   std::pair<GlobalPoint,GlobalPoint> pcas = minDist.points();
+   GlobalPoint pca1 = pcas.first;
+   GlobalPoint pca2 = pcas.second;
+   ROOT::Math::SVector<double, 3> distanceVector(pca1.x()-pca2.x(), pca1.y()-pca2.y(), pca1.z()-pca2.z());
+   const float twoTkDis3D = ROOT::Math::Mag(distanceVector);
+   float mass     = 0.139526;
+   float massigma = mass*1e-6;
+   float chi2 = 0.0f, ndf = 0.0f;
+   KinematicParticleFactoryFromTransientTrack pFactory;
+   RefCountedKinematicParticle tkAParticle = pFactory.particle(ttkA, mass, chi2, ndf, massigma);
+   RefCountedKinematicParticle tkBParticle = pFactory.particle(ttkB, mass, chi2, ndf, massigma);
+   float sig[6];
+   sig[0] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(0,0);
+   sig[1] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(0,1);
+   sig[2] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(1,1);
+   sig[3] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(0,2);
+   sig[4] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(1,2);
+   sig[5] = tkAParticle->stateAtPoint(pca1).kinematicParametersError().matrix()(2,2);
+   ROOT::Math::SMatrix<double, 3, 3, ROOT::Math::MatRepSym<double, 3> > pca1Cov(sig, sig+6);
+   sig[0] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(0,0);
+   sig[1] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(0,1);
+   sig[2] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(1,1);
+   sig[3] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(0,2);
+   sig[4] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(1,2);
+   sig[5] = tkBParticle->stateAtPoint(pca2).kinematicParametersError().matrix()(2,2);
+   ROOT::Math::SMatrix<double, 3, 3, ROOT::Math::MatRepSym<double, 3> > pca2Cov(sig, sig+6);
+   ROOT::Math::SMatrix<double, 3, 3, ROOT::Math::MatRepSym<double, 3> > totCov = pca1Cov + pca2Cov;
+   double twoTkDist3DEr = TMath::Sqrt(ROOT::Math::Similarity(totCov, distanceVector)) / twoTkDis3D;
+   dca3d2trks_sig = twoTkDis3D/twoTkDist3DEr;
+   distanceVector(2) = 0.0;
+   double twoTauDis2D    = ROOT::Math::Mag(distanceVector);
+   double twoTauDist2DEr = TMath::Sqrt(ROOT::Math::Similarity(totCov, distanceVector)) / twoTauDis2D;
+   dca2d2trks_sig = twoTauDis2D/twoTauDist2DEr;
+    }
+ }
+ return std::make_pair(dca3d2trks_sig,dca2d2trks_sig);
+}
+void chi2_ndf_num2tv_dca2trks(std::vector<TransientTrack> &ttrks,double &chi2_ndf, double &num2tv,double& dca3d2t,double& dca2d2t){
+ double num2v   = 0;
+ double numno2v = 0;
+ if(ttrks.size()>=2){
+    TransientVertex tv;
+    tv = vtxFitter.vertex(ttrks);
+    if(tv.isValid()) chi2_ndf = (tv.totalChiSquared())/(tv.degreesOfFreedom());
+    for(uint t=0; t<ttrks.size(); t++){
+     for(uint t2=t+1; t2<ttrks.size(); t2++){
+      std::vector<TransientTrack> twotrks;
+      twotrks.push_back(ttrks[t]);
+      twotrks.push_back(ttrks[t2]);
+      TransientVertex tv_2tracks = vtxFitter.vertex(twotrks);
+      if(tv_2tracks.isValid() && TMath::Prob(tv_2tracks.totalChiSquared(),tv_2tracks.degreesOfFreedom())>0.05){
+        num2v++;
+        std::pair<double,double> dca2trks3d2d = dca2trks(ttrks[t], ttrks[t2]);
+        dca3d2t += dca2trks3d2d.first;
+        dca2d2t += dca2trks3d2d.second;
+      }
+      else numno2v++;
+     }
+    }
+    num2tv = (numno2v/(num2v+numno2v));
+ }
+}
+
 
 GlobalVector flightDirection(const reco::Vertex & pv, const reco::Vertex & sv) {
 return  GlobalVector(sv.x() - pv.x(), sv.y() - pv.y(),sv.z() - pv.z());
@@ -705,6 +784,7 @@ void TemplatedSecondaryVertexProducer<IPTI,VTX>::produce(edm::Event &event,
 		// build transient tracks used for vertex reconstruction
 
 		std::vector<TransientTrack> fitTracks;
+                std::vector<TransientTrack> tracks_tofit;
 		std::vector<GhostTrackState> gtStates;
 		std::auto_ptr<GhostTrackPrediction> gtPred;
 		if (useGhostTrack)
@@ -718,6 +798,9 @@ void TemplatedSecondaryVertexProducer<IPTI,VTX>::produce(edm::Event &event,
 
 			trackData.push_back(IndexedTrackData());
 			trackData.back().first = indices[i];
+                        TransientTrack track_tofit;
+                        track_tofit   = trackBuilder->build(trackRef);
+                        tracks_tofit.push_back(track_tofit);
 
 			// select tracks for SV finder
 
@@ -889,7 +972,15 @@ void TemplatedSecondaryVertexProducer<IPTI,VTX>::produce(edm::Event &event,
 		svData.resize(vtxIndices.size());
 		for(unsigned int idx = 0; idx < vtxIndices.size(); idx++) {
 			const SecondaryVertex &sv = SVs[vtxIndices[idx]];
-
+                        double chi2_ndf = 0;
+                        double num2tv   = 0;
+                        double dca3d2t  = 0;
+                        double dca2d2t  = 0;
+                        chi2_ndf_num2tv_dca2trks(tracks_tofit,chi2_ndf,num2tv,dca3d2t,dca2d2t);
+                        svData[idx].get_chi2ndf = chi2_ndf;
+                        svData[idx].get_num2tv  = num2tv;
+                        svData[idx].get_dca2d2t = dca2d2t;
+                        svData[idx].get_dca3d2t = dca3d2t;
 			svData[idx].vertex = sv;
 			svData[idx].dist1d = sv.dist1d();
                         svData[idx].dist2d = sv.dist2d();
@@ -898,6 +989,7 @@ void TemplatedSecondaryVertexProducer<IPTI,VTX>::produce(edm::Event &event,
 			// mark tracks successfully used in vertex fit
 			markUsedTracks(trackData,trackRefs,sv,idx);
 		}
+                tracks_tofit.clear();
 
 		// fill result into tag infos
 
