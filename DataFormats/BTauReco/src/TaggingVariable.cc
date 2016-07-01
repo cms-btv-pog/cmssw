@@ -15,6 +15,13 @@ const char* const TaggingVariableDescription[] = {
   /* [jetEta]                                   = */ "jet pseudorapidity",
   /* [jetPhi]                                   = */ "jet polar angle",
   /* [jetNTracks]                               = */ "tracks associated to jet",
+ 
+  /* [jetNTracks_PV]                            = */ "tracks associated to jet coming from primary Vertex",
+  /* [jetNTracks_nonPV]                         = */ "tracks associated to jet not coming from primary Vertex",
+  /* [jetPt_Tracks]                             = */ "jet transverse momentum from the vector sum of the transverse momentum of associated tracks ",
+  /* [jetPt_PVTracks]                           = */ "jet transverse momentum from the vector sum of the transverse momentum of associated tracks coming from primary Vertex",
+  /* [jetPt_nonPVTracks]                        = */ "jet transverse momentum from the vector sum of the transverse momentum of associated tracks not coming from primary Vertex",
+ 
 
   /* [trackMomentum]                            = */ "track momentum",
   /* [trackEta]                                 = */ "track pseudorapidity",
@@ -28,11 +35,25 @@ const char* const TaggingVariableDescription[] = {
   /* [trackDeltaR]                              = */ "track pseudoangular distance from the jet axis",
   /* [trackPtRatio]                             = */ "track transverse momentum, relative to the jet axis, normalized to its energy",
   /* [trackPParRatio]                           = */ "track parallel momentum, along the jet axis, normalized to its energy",
-
+ 
+  /* [trackIp1dVal]                             = */ "track 1D impact parameter",
+  /* [trackIp1dSig]                             = */ "track 1D impact parameter significance",
+  /* [trackIp2dVal]                             = */ "track 2D impact parameter",
+  /* [trackIp2dSig]                             = */ "track 2D impact parameter significance"
+  /* [trackIp3dVal]                             = */ "track 3D impact parameter",
+  /* [trackIp3dSig]                             = */ "track 3D impact parameter significance",
+  /* [trackSip1dVal]                            = */ "track 1D signed impact parameter",
+  /* [trackSip1dSig]                            = */ "track 1D signed impact parameter significance",
   /* [trackSip2dVal]                            = */ "track 2D signed impact parameter",
   /* [trackSip2dSig]                            = */ "track 2D signed impact parameter significance",
   /* [trackSip3dVal]                            = */ "track 3D signed impact parameter",
   /* [trackSip3dSig]                            = */ "track 3D signed impact parameter significance",
+  /* [trackAveSip1dVal]                         = */ "track average 1D signed impact parameter",
+  /* [trackAveSip1dSig]                         = */ "track average 1D signed impact parameter significance",
+  /* [trackAveSip2dVal]                         = */ "track average 2D signed impact parameter",
+  /* [trackAveSip2dSig]                         = */ "track average 2D signed impact parameter significance",
+  /* [trackAveSip3dVal]                         = */ "track average 3D signed impact parameter",
+  /* [trackAveSip3dSig]                         = */ "track average 3D signed impact parameter significance",
   /* [trackDecayLenVal]                         = */ "track decay length",
   /* [trackDecayLenSig]                         = */ "track decay length significance",
   /* [trackJetDistVal]                          = */ "minimum track approach distance to jet axis",
@@ -63,7 +84,10 @@ const char* const TaggingVariableDescription[] = {
   /* [flightDistance2dSig]                      = */ "transverse distance significance between primary and secondary vertex",
   /* [flightDistance3dVal]                      = */ "distance between primary and secondary vertex",
   /* [flightDistance3dSig]                      = */ "distance significance between primary and secondary vertex",
-
+  /* [SVchi2_ndf_ratio]                         = */ "ratio of the chi2 and ndf of the fit of the secondry vertex",
+  /* [SVnum2tv]                                 = */ "Fraction of times that two jet tracks do not come from the same vertex",
+  /* [DCA_2tracks_3d]                           = */ "3D Distance of closest approach between two tracks",
+  /* [DCA_2tracks_2d]                           = */ "2D Distance of closest approach between two tracks",
   /* [trackSip2dValAboveCharm]                  = */ "track 2D signed impact parameter of first track lifting mass above charm",
   /* [trackSip2dSigAboveCharm]                  = */ "track 2D signed impact parameter significance of first track lifting mass above charm",
   /* [trackSip3dValAboveCharm]                  = */ "track 3D signed impact parameter of first track lifting mass above charm",
@@ -144,6 +168,14 @@ const char* const TaggingVariableTokens[] = {
   /* [jetPhi]                                   = */ "jetPhi",
   /* [jetNTracks]                               = */ "jetNTracks",
 
+
+  /* [jetNTracks_PV]                            = */ "jetNTracks_PV",
+  /* [jetNTracks_nonPV]                         = */ "jetNTracks_nonPV",
+  /* [jetPt_Tracks]                             = */ "jetPt_Tracks",
+  /* [jetPt_PVTracks]                           = */ "jetPt_PVTracks",
+  /* [jetPt_nonPVTracks]                        = */ "jetPt_nonPVTracks",
+
+
   /* [trackMomentum]                            = */ "trackMomentum",
   /* [trackEta]                                 = */ "trackEta",
   /* [trackPhi]                                 = */ "trackPhi",
@@ -157,10 +189,24 @@ const char* const TaggingVariableTokens[] = {
   /* [trackPtRatio]                             = */ "trackPtRatio",
   /* [trackPParRatio]                           = */ "trackPParRatio",
 
+  /* [trackIp1dVal]                             = */ "trackIp1dVal",
+  /* [trackIp1dSig]                             = */ "trackIp1dSig",
+  /* [trackIp2dVal]                             = */ "trackIp2dVal",
+  /* [trackIp2dSig]                             = */ "trackIp2dSig",
+  /* [trackIp3dVal]                             = */ "trackIp3dVal",
+  /* [trackIp3dSig]                             = */ "trackIp3dSig",
+  /* [trackSip1dVal]                            = */ "trackSip1dVal",
+  /* [trackSip1dSig]                            = */ "trackSip1dSig",
   /* [trackSip2dVal]                            = */ "trackSip2dVal",
   /* [trackSip2dSig]                            = */ "trackSip2dSig",
   /* [trackSip3dVal]                            = */ "trackSip3dVal",
   /* [trackSip3dSig]                            = */ "trackSip3dSig",
+  /* [trackAveSip1dVal]                         = */ "trackAveSip1dVal",
+  /* [trackAveSip1dSig]                         = */ "trackAveSip1dSig",
+  /* [trackAveSip2dVal]                         = */ "trackAveSip2dVal",
+  /* [trackAveSip2dSig]                         = */ "trackAveSip2dSig",
+  /* [trackAveSip3dVal]                         = */ "trackAveSip3dVal",
+  /* [trackAveSip3dSig]                         = */ "trackAveSip3dSig",
   /* [trackDecayLenVal]                         = */ "trackDecayLenVal",
   /* [trackDecayLenSig]                         = */ "trackDecayLenSig",
   /* [trackJetDistVal]                          = */ "trackJetDist",    //FIXME
@@ -191,6 +237,10 @@ const char* const TaggingVariableTokens[] = {
   /* [flightDistance2dSig]                      = */ "flightDistance2dSig",
   /* [flightDistance3dVal]                      = */ "flightDistance3dVal",
   /* [flightDistance3dSig]                      = */ "flightDistance3dSig",
+  /* [SVchi2_ndf_ratio]                         = */ "SVchi2_ndf_ratio",
+  /* [SVnum2tv]                                 = */ "SVnum2tv",
+  /* [DCA_2tracks_3d]                           = */ "DCA_2tracks_3d",
+  /* [DCA_2tracks_2d]                           = */ "DCA_2tracks_2d",
 
   /* [trackSip2dValAboveCharm]                  = */ "trackSip2dValAboveCharm",
   /* [trackSip2dSigAboveCharm]                  = */ "trackSip2dSigAboveCharm",

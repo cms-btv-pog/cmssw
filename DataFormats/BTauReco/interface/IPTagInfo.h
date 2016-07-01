@@ -28,6 +28,10 @@ inline  const reco::Track * toTrack(const reco::CandidatePtr & c) {return (*c).b
   struct TrackIPData {
     GlobalPoint closestToJetAxis;
     GlobalPoint closestToGhostTrack;
+    Measurement1D Absip1d;
+    Measurement1D Absip2d;
+    Measurement1D Absip3d;
+    Measurement1D ip1d;
     Measurement1D ip2d;
     Measurement1D ip3d;
     Measurement1D distanceToJetAxis;
@@ -40,8 +44,8 @@ inline  const reco::Track * toTrack(const reco::CandidatePtr & c) {return (*c).b
     double min_pT_dRcut,  max_pT_dRcut;
     double max_pT_trackPTcut;
   };
-  enum SortCriteria { IP3DSig = 0, Prob3D, IP2DSig, Prob2D, 
-                      IP3DValue, IP2DValue };
+  enum SortCriteria { IP3DSig = 0, Prob3D, IP2DSig, IP1DSig, Prob2D, 
+                      IP3DValue, IP2DValue, IP1DValue };
 
 }
 
@@ -184,10 +188,18 @@ template <class Container, class Base> TaggingVariableList IPTagInfo<Container,B
      vars.insert(btau::trackDeltaR, VectorUtil::DeltaR(trackMom, jetDir), true);
      vars.insert(btau::trackPtRatio, VectorUtil::Perp(trackMom, jetDir) / trackMag, true);
      vars.insert(btau::trackPParRatio, jetDir.Dot(trackMom) / trackMag, true);
+     vars.insert(btau::trackIp3dVal,  data->Absip3d.value(), true);
+     vars.insert(btau::trackIp3dSig,  data->Absip3d.significance(), true);
+     vars.insert(btau::trackIp2dVal,  data->Absip2d.value(), true);
+     vars.insert(btau::trackIp2dSig,  data->Absip2d.significance(), true);
+     vars.insert(btau::trackIp1dVal,  data->Absip1d.value(), true);
+     vars.insert(btau::trackIp1dSig,  data->Absip1d.significance(), true);
      vars.insert(btau::trackSip3dVal, data->ip3d.value(), true);
      vars.insert(btau::trackSip3dSig, data->ip3d.significance(), true);
      vars.insert(btau::trackSip2dVal, data->ip2d.value(), true);
      vars.insert(btau::trackSip2dSig, data->ip2d.significance(), true);
+     vars.insert(btau::trackSip1dVal, data->ip1d.value(), true);
+     vars.insert(btau::trackSip1dSig, data->ip1d.significance(), true);
      vars.insert(btau::trackDecayLenVal, havePv ? (data->closestToJetAxis - pv).mag() : -1.0, true);
      vars.insert(btau::trackJetDistVal, data->distanceToJetAxis.value(), true);
      vars.insert(btau::trackJetDistSig, data->distanceToJetAxis.significance(), true);
@@ -267,11 +279,17 @@ template<class Container, class Base> std::vector<size_t> IPTagInfo<Container,Ba
       case IP2DSig:
            sortingKey=m_data[i].ip2d.significance();
            break;
+      case IP1DSig:
+           sortingKey=m_data[i].ip1d.significance();
+           break;
       case IP3DValue:
            sortingKey=m_data[i].ip3d.value();
            break;
       case IP2DValue:
            sortingKey=m_data[i].ip2d.value();
+           break;
+      case IP1DValue:
+           sortingKey=m_data[i].ip1d.value();
            break;
       case Prob3D:
            sortingKey=m_prob3d[i];
