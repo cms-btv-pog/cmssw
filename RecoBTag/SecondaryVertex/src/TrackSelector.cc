@@ -103,11 +103,27 @@ TrackSelector::trackSelection(const Track &track,
                               const GlobalPoint &pv) const
 {
 
+	bool minHitsOk = false;
+  if(
+		//request 2 pixel hits and enough strip hits:
+		( (minPixelHits <= 0 || track.hitPattern().numberOfValidPixelHits() == (int)minPixelHits) && 
+		( (minTotalHits <= 0 || track.hitPattern().numberOfValidHits() >= (int)minTotalHits ) ) ) ||
+		//or request 3 pixel hits and less strip hits  
+    ( (minPixelHits <= 0 || track.hitPattern().numberOfValidPixelHits() == (int)minPixelHits+1) && 
+		((minTotalHits <= 0 || track.hitPattern().numberOfValidHits() >= (int)minTotalHits-3 ) ) ) ||
+		//or request at least 4 pixel hits and less strip hits  
+    ( (minPixelHits <= 0 || track.hitPattern().numberOfValidPixelHits() >= (int)minPixelHits+2) && 
+		((minTotalHits <= 0 || track.hitPattern().numberOfValidHits() >= (int)minTotalHits-4 ) ) )
+	)
+		minHitsOk = true;
+	
+
   return (!selectQuality || track.quality(quality)) &&
-    (minPixelHits <= 0 ||
-     track.hitPattern().numberOfValidPixelHits() >= (int)minPixelHits) &&
-    (minTotalHits <= 0 ||
-     track.hitPattern().numberOfValidHits() >= (int)minTotalHits) &&
+//    (minPixelHits <= 0 ||
+//     track.hitPattern().numberOfValidPixelHits() >= (int)minPixelHits) &&
+//    (minTotalHits <= 0 ||
+//     track.hitPattern().numberOfValidHits() >= (int)minTotalHits) &&
+    minHitsOk &&
     track.normalizedChi2() < maxNormChi2 &&
     std::abs(ipData.distanceToJetAxis.value()) <= maxDistToAxis &&
     (ipData.closestToJetAxis - pv).mag() <= maxDecayLen &&
