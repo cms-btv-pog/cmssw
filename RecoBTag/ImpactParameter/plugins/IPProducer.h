@@ -297,8 +297,17 @@ IPProducer<Container,Base,Helper>::produce(edm::Event& iEvent, const edm::EventS
                " #pixel " <<    track.hitPattern().numberOfValidPixelHits()<< endl;
 */
        if (track.pt() > m_cutMinPt &&
-           track.hitPattern().numberOfValidHits() >= m_cutTotalHits &&         // min num tracker hits
-           track.hitPattern().numberOfValidPixelHits() >= m_cutPixelHits &&
+//           track.hitPattern().numberOfValidHits() >= m_cutTotalHits &&         // min num tracker hits
+//           track.hitPattern().numberOfValidPixelHits() >= m_cutPixelHits &&
+           //request 2 pixel hits and enough strip hits:
+					 ( ( (track.hitPattern().numberOfValidPixelHits() == m_cutPixelHits) && 
+					 (track.hitPattern().numberOfValidHits() >= m_cutTotalHits ) ) ||
+					 //or request 3 pixel hits and less strip hits  
+           ( (track.hitPattern().numberOfValidPixelHits() == m_cutPixelHits+1) && 
+					 (track.hitPattern().numberOfValidHits() >= m_cutTotalHits-3 ) ) ||
+					 //or request at least 4 pixel hits and less strip hits  
+           ( (track.hitPattern().numberOfValidPixelHits() >= m_cutPixelHits+2) && 
+					 (track.hitPattern().numberOfValidHits() >= m_cutTotalHits-4 ) ) ) && 
            track.normalizedChi2() < m_cutMaxChiSquared &&
            std::abs(track.dxy(pv->position())) < m_cutMaxTIP &&
            std::abs(track.dz(pv->position())) < m_cutMaxLIP) {
