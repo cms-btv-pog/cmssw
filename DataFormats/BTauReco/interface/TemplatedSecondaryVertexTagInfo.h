@@ -58,11 +58,12 @@ class TemplatedSecondaryVertexTagInfo : public BaseTagInfo {
 
         struct VertexData {
                 VTX                             vertex;
-                Measurement1D                   dist2d, dist3d;
+                Measurement1D                   dist1d,dist2d, dist3d;
+                double                          get_chi2ndf,get_num2tv,get_dca3d2t,get_dca2d2t;
                 GlobalVector                    direction;
 		
 		// Used by ROOT storage
-		CMS_CLASS_VERSION(11)
+		CMS_CLASS_VERSION(12)
         };
 
         struct TrackFinder {
@@ -149,11 +150,26 @@ class TemplatedSecondaryVertexTagInfo : public BaseTagInfo {
 	float trackWeight(unsigned int svIndex, const typename input_container::value_type &track) const;
 
 	Measurement1D
-	flightDistance(unsigned int index, bool in2d = false) const
-	{ return in2d ? m_svData[index].dist2d : m_svData[index].dist3d; }
+	flightDistance(unsigned int index, int dim =0) const{
+          if(dim==1)      return m_svData[index].dist1d;
+          else if(dim==2) return m_svData[index].dist2d;
+          else            return m_svData[index].dist3d;
+        }
+        const double &chi2ndf(unsigned int index)const{
+           return m_svData[index].get_chi2ndf;
+        }
+        const double &num2tv(unsigned int index)const{
+           return m_svData[index].get_num2tv;
+        }
+        const double &dca2d2t(unsigned int index)const{
+           return m_svData[index].get_dca2d2t;
+        }
+        const double &dca3d2t(unsigned int index)const{
+           return m_svData[index].get_dca3d2t;
+        }
+
 	const GlobalVector &flightDirection(unsigned int index) const
 	{ return m_svData[index].direction; }
-
 	virtual TaggingVariableList taggingVariables() const;
 	
 	// Used by ROOT storage
@@ -302,6 +318,10 @@ template<class IPTI,class VTX> TaggingVariableList  TemplatedSecondaryVertexTagI
 
 	for(typename std::vector<typename TemplatedSecondaryVertexTagInfo<IPTI,VTX>::VertexData>::const_iterator iter = m_svData.begin();
 	    iter != m_svData.end(); iter++) {
+                vars.insert(btau::flightDistance1dVal,
+                                        iter->dist1d.value(), true);
+                vars.insert(btau::flightDistance1dSig,
+                                        iter->dist1d.significance(), true); 
 		vars.insert(btau::flightDistance2dVal,
 					iter->dist2d.value(), true);
 		vars.insert(btau::flightDistance2dSig,
