@@ -16,6 +16,13 @@ candidateCombinedSecondaryVertexSoftLeptonComputer = cms.ESProducer("CandidateCo
 		'CombinedSVPseudoVertexSoftElectron', 
 		'CombinedSVNoVertexSoftElectron'),
         recordLabel = cms.string(''),
-	categoryVariableName = cms.string('vertexLeptonCategory')
+	categoryVariableName = cms.string('vertexLeptonCategory'),
+	SoftLeptonFlip = cms.bool(False),
+  leptonsSelection = cms.PSet(
+      sip2dSigMax = cms.double(99999.9),
+      sip2dSigMin = cms.double(-99999.9),
+      sip3dSigMax = cms.double(99999.9),
+      sip3dSigMin = cms.double(-99999.9),
+      )
 )
 

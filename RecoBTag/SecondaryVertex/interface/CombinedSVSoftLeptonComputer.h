@@ -9,13 +9,13 @@
 #include "DataFormats/BTauReco/interface/CandSoftLeptonTagInfo.h"
 #include "DataFormats/BTauReco/src/classes.h"
 #include "DataFormats/PatCandidates/interface/Jet.h"
-
+#include <random>
 
 class CombinedSVSoftLeptonComputer : public CombinedSVComputer {
     public:
 	explicit CombinedSVSoftLeptonComputer(const edm::ParameterSet &params);
 	
-	double flipSoftLeptonValue(double value) const;
+	inline double flipSoftLeptonValue(double value, bool doflip) const {return doflip ? -value : value;}
 	
 	template <class IPTI,class SVTI>
 	reco::TaggingVariableList
@@ -24,13 +24,11 @@ class CombinedSVSoftLeptonComputer : public CombinedSVComputer {
 		     const reco::CandSoftLeptonTagInfo &elecInfo ) const;
 	
 	private:
-	bool					SoftLeptonFlip;
+	bool					SoftLeptonFlip_;
+	double lepSip2dSigMin_, lepSip2dSigMax_;
+	double lepSip3dSigMin_, lepSip3dSigMax_;
 };
 
-double CombinedSVSoftLeptonComputer::flipSoftLeptonValue(double value) const
-{
-	return SoftLeptonFlip ? -value : value;
-}
 
 template <class IPTI,class SVTI>
 reco::TaggingVariableList CombinedSVSoftLeptonComputer::operator () (const IPTI &ipInfo, const SVTI &svInfo,
@@ -47,16 +45,35 @@ reco::TaggingVariableList CombinedSVSoftLeptonComputer::operator () (const IPTI 
 	if (vtxType == 99)
      		return vars;
 
+	//get seed. If no SL are found the seed is always 1, but we do not case since we do not fill anything
+	int seed = 1;
+	if(muonInfo.leptons() > 0) 
+		seed = 1 + round(10000.*muonInfo.properties(0).deltaR);
+	else if(elecInfo.leptons() > 0)
+		seed = 1 + round(10000.*elecInfo.properties(0).deltaR);
+	
+	//Draw randomly (thread safe) to choose wether to flip or not the sign
+	bool doflip = false;
+	if(SoftLeptonFlip_) {
+		std::mt19937_64 random;
+		random.seed(seed);
+		std::uniform_real_distribution<float> dist(0.f,1.f);
+		float rndm = dist(random);
+		if(rndm<0.5) doflip=true;
+	}
 	
 	// the following is specific to soft leptons
 	int leptonCategory = 0; // 0 = no lepton, 1 = muon, 2 = electron
 	
 	for (unsigned int i = 0; i < muonInfo.leptons(); ++i) // loop over all muons, not optimal -> find the best or use ranking from best to worst
 	{
-		leptonCategory = 1; // muon category
 		const SoftLeptonProperties & propertiesMuon = muonInfo.properties(i);
+		if(propertiesMuon.sip2dsig < lepSip2dSigMin_ || propertiesMuon.sip2dsig > lepSip2dSigMax_) continue;
+		if(propertiesMuon.sip3dsig < lepSip3dSigMin_ || propertiesMuon.sip3dsig > lepSip3dSigMax_) continue;
+
+		leptonCategory = 1; // muon category
 		vars.insert(btau::leptonPtRel,propertiesMuon.ptRel , true);
-		vars.insert(btau::leptonSip3d,flipSoftLeptonValue(propertiesMuon.sip3d) , true);
+		vars.insert(btau::leptonSip3d,flipSoftLeptonValue(propertiesMuon.sip3d, doflip) , true);
 		vars.insert(btau::leptonDeltaR,propertiesMuon.deltaR , true);
 		vars.insert(btau::leptonRatioRel,propertiesMuon.ratioRel , true);
 		vars.insert(btau::leptonEtaRel,propertiesMuon.etaRel , true);
@@ -67,10 +84,13 @@ reco::TaggingVariableList CombinedSVSoftLeptonComputer::operator () (const IPTI 
 	{ 
 		for (unsigned int i = 0; i < elecInfo.leptons(); ++i) // loop over all electrons, not optimal -> find the best or use ranking from best to worst
 		{
-			leptonCategory = 2; // electron category
 			const SoftLeptonProperties & propertiesElec = elecInfo.properties(i);
+			if(propertiesElec.sip2dsig < lepSip2dSigMin_ || propertiesElec.sip2dsig > lepSip2dSigMax_) continue;
+			if(propertiesElec.sip3dsig < lepSip3dSigMin_ || propertiesElec.sip3dsig > lepSip3dSigMax_) continue;
+
+			leptonCategory = 2; // electron category
 			vars.insert(btau::leptonPtRel,propertiesElec.ptRel , true);
-			vars.insert(btau::leptonSip3d,flipSoftLeptonValue(propertiesElec.sip3d) , true);
+			vars.insert(btau::leptonSip3d,flipSoftLeptonValue(propertiesElec.sip3d, doflip) , true);
 			vars.insert(btau::leptonDeltaR,propertiesElec.deltaR , true);
 			vars.insert(btau::leptonRatioRel,propertiesElec.ratioRel , true);
 			vars.insert(btau::leptonEtaRel,propertiesElec.etaRel , true);

@@ -20,6 +20,8 @@ charmTagsNegativeComputerCvsL.slComputerCfg.trackSelection.sip3dSigMax = 0
 charmTagsNegativeComputerCvsL.slComputerCfg.trackPseudoSelection.sip3dSigMax = 0
 charmTagsNegativeComputerCvsL.slComputerCfg.trackPseudoSelection.sip2dSigMin = -99999.9
 charmTagsNegativeComputerCvsL.slComputerCfg.trackPseudoSelection.sip2dSigMax = -2.0
+charmTagsNegativeComputerCvsL.slComputerCfg.leptonsSelection.sip2dSigMax = 0
+charmTagsNegativeComputerCvsL.slComputerCfg.leptonsSelection.sip3dSigMax = 0
 
 charmTagsNegativeComputerCvsB = charmTagsComputerCvsB.clone()
 
@@ -30,6 +32,8 @@ charmTagsNegativeComputerCvsB.slComputerCfg.trackSelection.sip3dSigMax = 0
 charmTagsNegativeComputerCvsB.slComputerCfg.trackPseudoSelection.sip3dSigMax = 0
 charmTagsNegativeComputerCvsB.slComputerCfg.trackPseudoSelection.sip2dSigMin = -99999.9
 charmTagsNegativeComputerCvsB.slComputerCfg.trackPseudoSelection.sip2dSigMax = -2.0
+charmTagsNegativeComputerCvsB.slComputerCfg.leptonsSelection.sip2dSigMax = 0
+charmTagsNegativeComputerCvsB.slComputerCfg.leptonsSelection.sip3dSigMax = 0
 
 #
 # Positive tagger
@@ -38,11 +42,17 @@ charmTagsNegativeComputerCvsB.slComputerCfg.trackPseudoSelection.sip2dSigMax = -
 charmTagsPositiveComputerCvsL = charmTagsComputerCvsL.clone(
 )
 
+charmTagsPositiveComputerCvsL.slComputerCfg.SoftLeptonFlip = cms.bool(True)
 charmTagsPositiveComputerCvsL.slComputerCfg.trackSelection.sip3dSigMin = 0
 charmTagsPositiveComputerCvsL.slComputerCfg.trackPseudoSelection.sip3dSigMin = 0
+charmTagsPositiveComputerCvsL.slComputerCfg.leptonsSelection.sip2dSigMin = 0
+charmTagsPositiveComputerCvsL.slComputerCfg.leptonsSelection.sip3dSigMin = 0
 
 charmTagsPositiveComputerCvsB = charmTagsComputerCvsB.clone(
 )
 
+charmTagsPositiveComputerCvsB.slComputerCfg.SoftLeptonFlip = cms.bool(True)
 charmTagsPositiveComputerCvsB.slComputerCfg.trackSelection.sip3dSigMin = 0
 charmTagsPositiveComputerCvsB.slComputerCfg.trackPseudoSelection.sip3dSigMin = 0
+charmTagsPositiveComputerCvsB.slComputerCfg.leptonsSelection.sip2dSigMin = 0
+charmTagsPositiveComputerCvsB.slComputerCfg.leptonsSelection.sip3dSigMin = 0
