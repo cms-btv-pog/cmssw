@@ -147,7 +147,6 @@ void CombinedSVComputer::fillCommonVariables(reco::TaggingVariableList & vars, r
                 vars.insert(btau::SVnum2tv,svInfo.num2tv(vtx),true);
                 vars.insert(btau::DCA_2tracks_2d,svInfo.dca2d2t(vtx),true);
                 vars.insert(btau::DCA_2tracks_3d,svInfo.dca3d2t(vtx),true);
-                std::cout<<"bla1"<<svInfo.chi2ndf(vtx)<<std::endl;
 	}
 
 	std::vector<std::size_t> indices = ipInfo.sortedIndexes(sortCriterium);
