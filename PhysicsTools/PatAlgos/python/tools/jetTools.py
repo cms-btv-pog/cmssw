@@ -627,11 +627,11 @@ class AddJetCollection(ConfigToolBase):
         ## check if any legacy btag discriminators are being used
         infos = 0
         for info in btagInfos:
-            if info.startswith('pf'): infos = infos + 1
+            if info.startswith('pf') or info.startswith('deep') or info.startswith('negativeDeep') or info.startswith('positiveDeep') : infos = infos + 1
             if 'softpf' in info.lower(): infos = infos + 1
         tags = 0
         for tag in btagDiscriminators:
-            if tag.startswith('pf'): tags = tags + 1
+            if tag.startswith('pf') or tag.startswith('deep') or tag.startswith('negativeDeep') or tag.startswith('positiveDeep'): tags = tags + 1
             if 'softpf' in tag.lower(): tags = tags + 1
         bTaggingLegacy=(len(btagDiscriminators)>tags or len(btagInfos)>infos)
         ## construct postfix label for auxiliary modules; this postfix
