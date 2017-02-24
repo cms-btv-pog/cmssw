@@ -629,10 +629,12 @@ class AddJetCollection(ConfigToolBase):
         for info in btagInfos:
             if info.startswith('pf'): infos = infos + 1
             if 'softpf' in info.lower(): infos = infos + 1
+            if 'deep' in info.lower(): infos = infos + 1
         tags = 0
         for tag in btagDiscriminators:
             if tag.startswith('pf'): tags = tags + 1
             if 'softpf' in tag.lower(): tags = tags + 1
+            if 'deep' in tag.lower(): tags = tags + 1
         bTaggingLegacy=(len(btagDiscriminators)>tags or len(btagInfos)>infos)
         ## construct postfix label for auxiliary modules; this postfix
         ## label will start with a capitalized first letter following
