@@ -286,7 +286,8 @@
   <class name="edm::Wrapper<reco::JetEisolAssociationCollection>"/>
 
 
-  <class name="reco::btag::TrackIPData" ClassVersion="11">
+  <class name="reco::btag::TrackIPData" ClassVersion="12">
+   <version ClassVersion="12" checksum="3264977115"/>
    <version ClassVersion="11" checksum="1865766744"/>
    <version ClassVersion="10" checksum="3653489242"/>
   </class>
