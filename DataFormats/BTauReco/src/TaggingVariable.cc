@@ -17,7 +17,8 @@ const char* const TaggingVariableDescription[] = {
   /* [jetNTracks]                               = */ "tracks associated to jet",
   /* [jetNSelectedTracks]                       = */ "selected tracks in the jet",
   /* [jetNTracksEtaRel]                         = */ "number of tracks for which etaRel is computed",
-
+  
+  /* [jetNchTracks]                             = */ "total charged and good tracks associated to jet",
   /* [jetNTracks_PV]                            = */ "tracks associated to jet coming from primary Vertex",
   /* [jetNTracks_nonPV]                         = */ "tracks associated to jet not coming from primary Vertex",
   /* [jetPt_Tracks]                             = */ "jet transverse momentum from the vector sum of the transverse momentum of associated tracks ",
@@ -176,7 +177,7 @@ const char* const TaggingVariableTokens[] = {
   /* [jetNSelectedTracks]                       = */ "jetNSelectedTracks",
   /* [jetNTracksEtaRel]                         = */ "jetNTracksEtaRel",
 
-
+  /* [jetNchTracks]                             = */ "jetNchTracks", 
   /* [jetNTracks_PV]                            = */ "jetNTracks_PV",
   /* [jetNTracks_nonPV]                         = */ "jetNTracks_nonPV",
   /* [jetPt_Tracks]                             = */ "jetPt_Tracks",
